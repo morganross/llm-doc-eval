@@ -1,11 +1,12 @@
 single_doc_eval:
   criteria_file: criteria.yaml # Reference to the new file
-  trial_count: 2
+  trial_count: 5
   outlier_threshold: 2.0
 
 pairwise_eval:
   # No specific criteria for pairwise, as it's about picking a winner
-  trial_count: 2 # Two trials per model for pairwise comparison
+  trial_count: 5 # Five trials per model for pairwise comparison
+  criteria_file: criteria.yaml # Reference to the criteria file for pairwise evaluation
 
 models:
   model_a:
@@ -14,3 +15,4 @@ models:
   model_b:
     name: gemini-2.5-flash-preview-05-20
     provider: google
+    enable_grounding: true # Enable Google Search grounding for this model

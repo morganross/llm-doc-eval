@@ -12,6 +12,8 @@ import logging
 import time # For exponential backoff
 
 from doc_eval.models.registry import get_llm
+import google.genai # Import the new Google GenAI SDK
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch # Import types for grounding
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,6 +27,7 @@ class Evaluator:
         self.single_doc_results = pd.DataFrame()
         self.pairwise_results = pd.DataFrame()
         self.db_engine = create_engine(f'sqlite:///{db_path}')
+        self.genai_client = google.genai.Client() # Initialize Google GenAI client
         logging.info(f"Evaluator initialized with config from {config_path}, prompts from {prompts_dir}, and DB at {db_path}")
 
     def _load_config(self, config_path):
@@ -43,18 +46,83 @@ class Evaluator:
                 logging.warning(f"Criteria file not found: {criteria_file_path}. Single-document criteria will be empty.")
                 config['single_doc_eval']['criteria'] = []
         
+        # Load criteria for pairwise evaluation if specified
+        if 'pairwise_eval' in config and 'criteria_file' in config['pairwise_eval']:
+            criteria_file_path = os.path.join(os.path.dirname(config_path), config['pairwise_eval']['criteria_file'])
+            if os.path.exists(criteria_file_path):
+                with open(criteria_file_path, 'r', encoding='utf-8') as f:
+                    criteria_data = yaml.safe_load(f)
+                # Assuming criteria are under 'single_doc_criteria' key in criteria.yaml (reusing for simplicity)
+                config['pairwise_eval']['criteria'] = criteria_data.get('single_doc_criteria', [])
+            else:
+                logging.warning(f"Criteria file not found: {criteria_file_path}. Pairwise criteria will be empty.")
+                config['pairwise_eval']['criteria'] = []
+        
         return config
 
-    def _get_llm_and_parser(self, model_name):
-        """Returns the LLM instance and a JSON parser."""
-        llm = get_llm(model_name, temperature=0.0)
-        parser = JsonOutputParser()
-        return llm, parser
+    def _get_llm_and_parser(self, model_name: str):
+        """Returns the LLM instance, a JSON parser, and grounding status."""
+        model_config = None
+        for model_key in ['model_a', 'model_b']:
+            if self.config['models'][model_key]['name'] == model_name:
+                model_config = self.config['models'][model_key]
+                break
+        
+        if model_config is None:
+            raise ValueError(f"Model configuration not found for {model_name}")
 
-    def _run_llm_call(self, llm, parser, prompt_text, retries=3):
+        enable_grounding = model_config.get('enable_grounding', False)
+        
+        llm = get_llm(model_name, temperature=0.0, enable_grounding=enable_grounding)
+        parser = JsonOutputParser()
+        return llm, parser, model_name, enable_grounding # Return model_name and enable_grounding
+
+    def _run_llm_call(self, llm, parser, prompt_text, model_name, enable_grounding, retries=3):
         for attempt in range(1, retries + 1):
             try:
-                response = llm.invoke(prompt_text)
+                response = None
+                if model_name.startswith("gemini-") and enable_grounding:
+                    # Use direct google.genai client for grounding
+                    google_search_tool = Tool(google_search=GoogleSearch())
+                    
+                    # LangChain's prompt_text is a string, need to wrap it for genai client
+                    contents = [{"parts": [{"text": prompt_text}]}]
+
+                    genai_response = self.genai_client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=GenerateContentConfig(
+                            tools=[google_search_tool],
+                            response_modalities=["TEXT"],
+                        )
+                    )
+                    # Extract content and grounding metadata from genai_response
+                    response_content = ""
+                    grounding_metadata = None
+                    if genai_response.candidates and genai_response.candidates[0].content.parts:
+                        for part in genai_response.candidates[0].content.parts:
+                            response_content += part.text
+                        grounding_metadata = genai_response.candidates[0].grounding_metadata
+                    
+                    # Simulate LangChain's BaseMessage structure for consistency with parser
+                    class MockAIMessage:
+                        def __init__(self, content, additional_kwargs=None):
+                            self.content = content
+                            self.additional_kwargs = additional_kwargs if additional_kwargs is not None else {}
+                    
+                    response = MockAIMessage(content=response_content, additional_kwargs={"grounding_metadata": grounding_metadata})
+                    
+                else:
+                    # Use LangChain's LLM for other models or no grounding
+                    response = llm.invoke(prompt_text)
+                
+                # Extract grounding metadata if available (from either path)
+                grounding_metadata = response.additional_kwargs.get("grounding_metadata")
+                if grounding_metadata:
+                    logging.info(f"  Grounding metadata received: {grounding_metadata}")
+                    # You might want to store this metadata or process it further
+                    # For now, just logging it.
+
                 # LangChain's parser expects a string, then parses it.
                 # If the LLM directly returns a dict (e.g., from a mock), handle it.
                 if isinstance(response, dict):
@@ -88,7 +156,7 @@ class Evaluator:
 
         logging.info(f"Starting single-document evaluation for doc_id: {doc_id}")
         for model_name in [model_a_name, model_b_name]:
-            llm, parser = self._get_llm_and_parser(model_name)
+            llm, parser, model_name_from_get_llm, enable_grounding = self._get_llm_and_parser(model_name)
             for trial in range(1, trial_count + 1):
                 logging.info(f"  Evaluating with {model_name}, trial {trial}")
                 input_data = {
@@ -98,7 +166,7 @@ class Evaluator:
                 rendered_prompt = self.single_doc_template.render(input_data)
                 
                 try:
-                    llm_response = self._run_llm_call(llm, parser, rendered_prompt)
+                    llm_response = self._run_llm_call(llm, parser, rendered_prompt, model_name_from_get_llm, enable_grounding)
                     for eval_item in llm_response.get('evaluations', []):
                         row = {
                             "doc_id": doc_id,
@@ -125,6 +193,7 @@ class Evaluator:
         model_a_name = self.config['models']['model_a']['name']
         model_b_name = self.config['models']['model_b']['name']
         pairwise_trial_count = self.config['pairwise_eval']['trial_count'] # Typically 1 for pairwise
+        pairwise_criteria = self.config['pairwise_eval']['criteria'] # Load pairwise criteria
 
         document_map = {doc_id: content for doc_id, content in doc_ids_contents}
         all_doc_ids = [doc_id for doc_id, _ in doc_ids_contents]
@@ -133,19 +202,20 @@ class Evaluator:
         for doc_id_1, doc_id_2 in combinations(all_doc_ids, 2):
             logging.info(f"  Evaluating pair: {doc_id_1} vs {doc_id_2}")
             for model_name in [model_a_name, model_b_name]:
-                llm, parser = self._get_llm_and_parser(model_name)
+                llm, parser, model_name_from_get_llm, enable_grounding = self._get_llm_and_parser(model_name)
                 for trial in range(1, pairwise_trial_count + 1):
                     logging.info(f"    Evaluating with {model_name}, trial {trial}")
                     input_data = {
                         "doc_id_1": doc_id_1,
                         "document_1": document_map[doc_id_1],
                         "doc_id_2": doc_id_2,
-                        "document_2": document_map[doc_id_2]
+                        "document_2": document_map[doc_id_2],
+                        "criteria": pairwise_criteria # Pass pairwise criteria to the template
                     }
                     rendered_prompt = self.pairwise_doc_template.render(input_data)
                     
                     try:
-                        llm_response = self._run_llm_call(llm, parser, rendered_prompt)
+                        llm_response = self._run_llm_call(llm, parser, rendered_prompt, model_name_from_get_llm, enable_grounding)
                         winner_doc_id = llm_response.get('winner_doc_id')
                         reason = llm_response.get('reason')
 

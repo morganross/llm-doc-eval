@@ -6,7 +6,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 load_dotenv()
 
-def get_llm(model_name: str, temperature: float = 0.0) -> BaseChatModel:
+def get_llm(model_name: str, temperature: float = 0.0, enable_grounding: bool = False) -> BaseChatModel:
     """
     Returns a LangChain LLM instance based on the model name.
 
@@ -14,6 +14,7 @@ def get_llm(model_name: str, temperature: float = 0.0) -> BaseChatModel:
         model_name (str): The name of the model (e.g., "o4-mini-2025-04-16", "gemini-2.5-flash-preview-05-20").
         temperature (float): The temperature setting for the LLM.
                              Note: Some models may not support temperature=0.0.
+        enable_grounding (bool): Whether to enable Google Search grounding for Gemini models.
 
     Returns:
         BaseChatModel: An instance of a LangChain chat model.
@@ -31,7 +32,10 @@ def get_llm(model_name: str, temperature: float = 0.0) -> BaseChatModel:
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GOOGLE_API_KEY not found in environment variables.")
-        return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
+        
+        llm = ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
+        
+        return llm
     else:
         raise ValueError(f"Unsupported model name: {model_name}")
 
@@ -45,6 +49,13 @@ if __name__ == '__main__':
         # print(response.content)
 
         print("\nTesting Google gemini-2.5-flash-preview-05-20:")
+        # Test with grounding enabled
+        google_llm_grounded = get_llm("gemini-2.5-flash-preview-05-20", enable_grounding=True)
+        # response = google_llm_grounded.invoke("When is the next total solar eclipse in the United States?")
+        # print(response.content)
+        # print(response.additional_kwargs.get("grounding_metadata")) # Check for grounding metadata
+
+        # Test without grounding
         google_llm = get_llm("gemini-2.5-flash-preview-05-20")
         # response = google_llm.invoke("Hello, what is your name?")
         # print(response.content)
