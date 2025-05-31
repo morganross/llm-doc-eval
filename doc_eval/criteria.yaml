@@ -1,0 +1,10 @@
+single_doc_criteria:
+  # Add a 'description' field to provide a plain English explanation for each criterion.
+  # This description can be used by the LLM to understand the criterion better.
+  - name: Clarity
+    scale: 5
+    description: "How easy is the document to understand? Is the language clear and concise? Are complex ideas explained simply?"
+  - name: Coherence
+    scale: 5
+  - name: Relevance
+    scale: 5

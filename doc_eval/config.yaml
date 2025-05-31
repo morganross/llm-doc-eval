@@ -1,0 +1,16 @@
+single_doc_eval:
+  criteria_file: criteria.yaml # Reference to the new file
+  trial_count: 2
+  outlier_threshold: 2.0
+
+pairwise_eval:
+  # No specific criteria for pairwise, as it's about picking a winner
+  trial_count: 2 # Two trials per model for pairwise comparison
+
+models:
+  model_a:
+    name: o4-mini-2025-04-16
+    provider: openai
+  model_b:
+    name: gemini-2.5-flash-preview-05-20
+    provider: google

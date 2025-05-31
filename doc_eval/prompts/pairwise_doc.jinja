@@ -1,0 +1,20 @@
+You are an expert document comparison AI. Your task is to compare two documents and determine which one is superior based on overall quality, clarity, and relevance.
+
+**Document 1 (ID: {{ doc_id_1 }}):**
+```
+{{ document_1 }}
+```
+
+**Document 2 (ID: {{ doc_id_2 }}):**
+```
+{{ document_2 }}
+```
+
+Return your decision as a JSON object with the following structure:
+```json
+{
+  "winner_doc_id": "<ID_of_the_superior_document>",
+  "reason": "<brief_reason_for_the_decision>"
+}
+```
+Ensure the JSON is valid and contains only the specified structure. The `winner_doc_id` must be either "{{ doc_id_1 }}" or "{{ doc_id_2 }}". Do not include any additional text or formatting outside the JSON object.

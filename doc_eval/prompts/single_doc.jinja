@@ -1,0 +1,27 @@
+You are an expert document reviewer. Your task is to evaluate the provided document based on the following criteria and assign a score from 1 to {{ criteria[0].scale }} for each.
+
+**Criteria:**
+{% for criterion in criteria %}
+- {{ criterion.name }} (Score: 1-{{ criterion.scale }})
+{% endfor %}
+
+**Document to Evaluate:**
+```
+{{ document }}
+```
+
+Return your evaluation as a JSON object with the following structure:
+```json
+{
+  "evaluations": [
+    {% for criterion in criteria %}
+    {
+      "criterion": "{{ criterion.name }}",
+      "score": <score_value_1_to_{{ criterion.scale }}>,
+      "reason": "<brief_reason_for_score>"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+```
+Ensure the JSON is valid and contains only the specified structure. Do not include any additional text or formatting outside the JSON object.

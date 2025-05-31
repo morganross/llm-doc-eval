@@ -1,0 +1,8 @@
+langchain
+pandas
+typer
+python-dotenv
+pyyaml
+jinja2
+pytest
+langchain-google-genai
