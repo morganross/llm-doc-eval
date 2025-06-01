@@ -14,6 +14,9 @@ from doc_eval.engine.elo_calculator import calculate_elo_ratings # Import the ne
 app = typer.Typer()
 DB_PATH = 'doc_eval/results.db'
 
+# Global dictionary to store document paths
+DOC_PATHS = {}
+
 # Load configuration from config.yaml
 CONFIG_PATH = 'doc_eval/config.yaml'
 with open(CONFIG_PATH, 'r') as f:
@@ -48,7 +51,8 @@ def run_single(
         typer.echo("No .txt or .md documents found in the specified folder.")
         return
 
-    for doc_id, content in documents:
+    for doc_id, content, file_path in documents:
+        DOC_PATHS[doc_id] = file_path # Store the full path
         typer.echo(f"  Evaluating single document: {doc_id}")
         asyncio.run(evaluator.evaluate_single_document(doc_id, content)) # Use asyncio.run
     
@@ -101,7 +105,11 @@ def run_pairwise(
         return
     
     typer.echo(f"  Evaluating {len(documents)} documents in pairwise combinations.")
-    asyncio.run(evaluator.evaluate_pairwise_documents(documents)) # Use asyncio.run
+    # documents here is a list of (doc_id, content, file_path) tuples
+    # evaluator.evaluate_pairwise_documents expects a list of (doc_id, content) tuples
+    # so we need to pass only doc_id and content
+    documents_for_evaluator = [(doc_id, content) for doc_id, content, _ in documents]
+    asyncio.run(evaluator.evaluate_pairwise_documents(documents_for_evaluator)) # Use asyncio.run
 
     typer.echo("Pairwise evaluations complete.")
 
@@ -139,19 +147,18 @@ def summary_pairwise():
     typer.echo(combined_summary_df.to_string())
 
     if not combined_summary_df.empty:
-        # Document with highest Win Rate
-        highest_win_doc = combined_summary_df.loc[combined_summary_df['overall_win_rate'].idxmax()]
-        typer.echo(f"\n--- Document with Highest Win Rate ---")
-        typer.echo(f"Document ID: {highest_win_doc['doc_id']}")
-        typer.echo(f"Overall Win Rate: {highest_win_doc['overall_win_rate']:.2f}%")
-        typer.echo(f"Elo Rating: {highest_win_doc['elo_rating']:.2f}")
+        # Add full paths to the combined summary DataFrame
+        combined_summary_df['full_path'] = combined_summary_df['doc_id'].map(DOC_PATHS)
 
-        # Document with highest Elo Rating
-        highest_elo_doc = combined_summary_df.loc[combined_summary_df['elo_rating'].idxmax()]
-        typer.echo(f"\n--- Document with Highest Elo Rating ---")
-        typer.echo(f"Document ID: {highest_elo_doc['doc_id']}")
-        typer.echo(f"Overall Win Rate: {highest_elo_doc['overall_win_rate']:.2f}%")
-        typer.echo(f"Elo Rating: {highest_elo_doc['elo_rating']:.2f}")
+        typer.echo("\n--- Ranking by Win Rate (Highest First) ---")
+        win_rate_ranked_df = combined_summary_df.sort_values(by='overall_win_rate', ascending=False)
+        for index, row in win_rate_ranked_df.iterrows():
+            typer.echo(f"  {row['doc_id']} ({row['full_path']}): {row['overall_win_rate']:.2f}% Win Rate, Elo: {row['elo_rating']:.2f}")
+
+        typer.echo("\n--- Ranking by Elo Rating (Highest First) ---")
+        elo_ranked_df = combined_summary_df.sort_values(by='elo_rating', ascending=False)
+        for index, row in elo_ranked_df.iterrows():
+            typer.echo(f"  {row['doc_id']} ({row['full_path']}): {row['elo_rating']:.2f} Elo, Win Rate: {row['overall_win_rate']:.2f}%")
 
 @app.command()
 def raw_pairwise():

@@ -16,7 +16,7 @@ All evaluation results are systematically persisted to a SQLite database (`resul
 *   **Custom Evaluation Criteria**: Support for defining and using custom evaluation criteria via a `criteria.yaml` file, allowing for highly tailored assessments.
 *   **Google Search Grounding**: Enhance the accuracy and relevance of pairwise evaluations for Gemini models by enabling Google Search Grounding, providing real-time factual context.
 *   **Detailed Single-Document Summaries**: Generate comprehensive summaries for single-document evaluations, including mean scores, standard deviations, and individual trial scores for each criterion.
-*   **Comprehensive Pairwise Summaries**: Obtain in-depth summaries for pairwise evaluations, featuring overall win rates per document and clear identification of the best-performing document within a comparison set.
+*   **Comprehensive Pairwise Summaries**: Obtain in-depth summaries for pairwise evaluations, featuring overall win rates per document, clear identification of the best-performing document within a comparison set, and detailed rankings including full file paths.
 *   **Data Export Functionality**: Export raw and summarized evaluation data to CSV format for further analysis in external tools.
 *   **Modular Project Structure**:
     *   `cli.py`: The main command-line interface entry point.
@@ -131,27 +131,36 @@ Navigate to the `doc_eval/` directory in your terminal to use the CLI commands.
 The `config.yaml` file allows you to customize various aspects of the evaluation process:
 
 ```yaml
+llm_api:
+  max_concurrent_llm_calls: 15 # Master switch for controlling the rate of LLM API calls
+
 single_doc_eval:
+  trial_count: 5 # Number of times to run single document evaluation for each document
   criteria_file: criteria.yaml # Path to the custom criteria file
-  trial_count: 3 # Number of independent trials per model for single-doc eval
-  outlier_threshold: 2.0 # Z-score threshold for flagging outliers
 
 pairwise_eval:
-  trial_count: 1 # Number of independent trials per model for pairwise eval (typically 1)
+  trial_count: 2 # Number of times to run pairwise evaluation for each pair of documents
+  criteria_file: criteria.yaml # Path to the custom criteria file
   enable_grounding: false # Set to true to enable Google Search Grounding for Gemini models
 
 models:
   model_a:
-    name: OpenAI GPT-3.5 Turbo # Name of the LLM for Model A
-    provider: openai # Provider (e.g., openai, google)
+    name: o4-mini-2025-04-16
+    provider: openai
   model_b:
-    name: Google Gemini Pro # Name of the LLM for Model B
-    provider: google # Provider (e.g., openai, google)
+    name: gemini-2.5-flash-preview-05-20
+    provider: google
 ```
 
-*   `trial_count`: Specifies how many times each evaluation (single or pairwise) should be run independently to ensure result consistency.
-*   `enable_grounding`: A boolean flag that, when set to `true`, enables Google Search Grounding for Gemini models during pairwise evaluations. This helps ground the LLM's responses in real-world information.
-*   `criteria_file`: Specifies the path to the YAML file containing custom evaluation criteria.
+*   `llm_api.max_concurrent_llm_calls`: Controls the maximum number of concurrent LLM API calls to prevent rate limiting.
+*   `single_doc_eval.trial_count`: Specifies how many times each single-document evaluation should be run independently.
+*   `single_doc_eval.criteria_file`: Specifies the path to the YAML file containing custom criteria for single-document evaluations.
+*   `pairwise_eval.trial_count`: Specifies how many times each pairwise evaluation should be run independently.
+*   `pairwise_eval.criteria_file`: Specifies the path to the YAML file containing custom criteria for pairwise evaluations.
+*   `pairwise_eval.enable_grounding`: A boolean flag that, when set to `true`, enables Google Search Grounding for Gemini models during pairwise evaluations. This helps ground the LLM's responses in real-world information.
+*   `models`: Defines the LLM models used for evaluations. `model_a` and `model_b` are used for comparison.
+    *   `name`: The specific model name (e.g., `o4-mini-2025-04-16`, `gemini-2.5-flash-preview-05-20`).
+    *   `provider`: The LLM provider (e.g., `openai`, `google`).
 
 ## Custom Criteria (`criteria.yaml`)
 
@@ -160,14 +169,38 @@ You can define your own evaluation criteria in `criteria.yaml`. This file allows
 Example `criteria.yaml`:
 
 ```yaml
-- name: Clarity
-  scale: 5
-- name: Coherence
-  scale: 5
-- name: Relevance
-  scale: 5
-- name: Accuracy
-  scale: 10
+single_doc_criteria:
+  - name: Factual Accuracy
+    scale: 5
+    description: "You MUST use google search grounding tool to verify the Accuracy of the document. You do not currently have up to date information."
+  - name: Completeness / Coverage
+    scale: 5
+    description: "Does the document fully address the stated topic or brief?"
+  - name: Redundancy
+    scale: 5
+    description: "Does the document avoid unnecessary repetition of ideas or paragraphs?"
+  - name: Logical Organization
+    scale: 5
+    description: "Does the argument follow a coherent sequence without jumps or backtracking?"
+  - name: Table-of-Contents Alignment
+    scale: 5
+    description: "Do body headings exactly match the text and order of the table of contents?"
+  - name: Hierarchy & Heading Consistency
+    scale: 5
+    description: "Are heading levels used consistently (H1/H2/H3) without skipped levels?"
+  - name: Section Balance
+    scale: 5
+    description: "Are sections proportionate to their importance; no bloated or scant sections?"
+  - name: Sentence Clarity
+    scale: 5
+    description: "Does every claim that needs a source have one?"
+  - name: Citation Format Consistency
+    scale: 5
+    description: "Are all references presented in a single, consistent citation style?"
+
+pairwise_doc_criteria:
+  - name: "preference"
+    description: "Indicate which document is preferred and why, considering all aspects."
 ```
 
 ## Development and Contribution
