@@ -1,12 +1,15 @@
+# doc_eval/config.yaml
+llm_api:
+
+  max_concurrent_llm_calls: 15 # Master switch for controlling the rate of LLM API calls
+
 single_doc_eval:
-  criteria_file: criteria.yaml # Reference to the new file
-  trial_count: 5
-  outlier_threshold: 2.0
+  trial_count: 5 # Number of times to run single document evaluation for each document
+  criteria_file: criteria.yaml # Add this line
 
 pairwise_eval:
-  # No specific criteria for pairwise, as it's about picking a winner
-  trial_count: 5 # Five trials per model for pairwise comparison
-  criteria_file: criteria.yaml # Reference to the criteria file for pairwise evaluation
+  trial_count: 2 # Number of times to run pairwise evaluation for each pair of documents
+  criteria_file: criteria.yaml # Add this line
 
 models:
   model_a:
@@ -15,4 +18,3 @@ models:
   model_b:
     name: gemini-2.5-flash-preview-05-20
     provider: google
-    enable_grounding: true # Enable Google Search grounding for this model

@@ -1,55 +1,127 @@
 doc_id,model,criterion,score_trial_1,score_trial_2,score_trial_3,score_trial_4,score_trial_5,mean_score,std_dev_score,has_outlier,overall_average_score
-Census Bureau,gemini-2.5-flash-preview-05-20,Citation Format Consistency,1.0,3.0,3.0,3.0,3.0,2.6,0.8944271909999159,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Citation Format Consistency,2.0,2.0,3.0,3.0,2.0,2.4,0.5477225575051661,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Completeness / Coverage,4.0,4.0,5.0,4.0,4.0,4.2,0.44721359549995804,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,1.0,5.0,1.0,4.0,3.0,1.8708286933869707,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,2.0,2.0,2.0,3.0,2.0,2.2,0.4472135954999579,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Hierarchy & Heading Consistency,3.0,2.0,4.0,3.0,3.0,3.0,0.7071067811865476,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Logical Organization,2.0,1.0,1.0,2.0,1.0,1.4,0.5477225575051661,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Logical Organization,5.0,3.0,4.0,3.0,4.0,3.8,0.8366600265340756,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Redundancy,3.0,2.0,1.0,2.0,1.0,1.8,0.8366600265340756,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Redundancy,3.0,2.0,3.0,2.0,3.0,2.6,0.5477225575051661,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Section Balance,3.0,2.0,2.0,3.0,2.0,2.4,0.5477225575051661,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Section Balance,3.0,3.0,3.0,3.0,4.0,3.2,0.44721359549995787,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Sentence Clarity,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Sentence Clarity,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.077777777777778
-Census Bureau,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,2.0,2.0,1.0,4.0,2.0,2.2,1.0954451150103321,False,3.077777777777778
-Census Bureau,o4-mini-2025-04-16,Table-of-Contents Alignment,5.0,2.0,5.0,2.0,4.0,3.6,1.51657508881031,False,3.077777777777778
-Census Bureau1,gemini-2.5-flash-preview-05-20,Citation Format Consistency,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Citation Format Consistency,2.0,3.0,3.0,2.0,3.0,2.6,0.5477225575051661,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Completeness / Coverage,5.0,4.0,4.0,4.0,4.0,4.2,0.44721359549995787,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,4.0,4.0,1.0,4.0,3.4,1.3416407864998738,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,2.0,1.0,1.0,2.0,1.0,1.4,0.5477225575051661,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Hierarchy & Heading Consistency,3.0,3.0,2.0,3.0,2.0,2.6,0.5477225575051661,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Logical Organization,2.0,1.0,1.0,2.0,1.0,1.4,0.5477225575051661,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Logical Organization,4.0,4.0,2.0,4.0,3.0,3.4,0.8944271909999159,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Redundancy,1.0,2.0,1.0,2.0,1.0,1.4,0.5477225575051661,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Redundancy,3.0,3.0,2.0,3.0,2.0,2.6,0.5477225575051661,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Section Balance,3.0,2.0,2.0,2.0,1.0,2.0,0.7071067811865476,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Section Balance,3.0,3.0,3.0,3.0,3.0,3.0,0.0,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Sentence Clarity,5.0,4.0,4.0,4.0,4.0,4.2,0.44721359549995787,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Sentence Clarity,4.0,4.0,4.0,5.0,4.0,4.2,0.4472135954999579,False,2.8222222222222224
-Census Bureau1,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,2.0,1.0,2.0,2.0,2.0,1.8,0.4472135954999579,False,2.8222222222222224
-Census Bureau1,o4-mini-2025-04-16,Table-of-Contents Alignment,3.0,3.0,2.0,3.0,2.0,2.6,0.5477225575051661,False,2.8222222222222224
-Census Bureau2,gemini-2.5-flash-preview-05-20,Citation Format Consistency,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Citation Format Consistency,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Completeness / Coverage,5.0,5.0,5.0,5.0,4.0,4.8,0.44721359549995787,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,4.0,5.0,5.0,4.8,0.44721359549995804,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,4.0,1.0,2.0,5.0,3.2,1.6431676725154984,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,3.0,2.0,2.0,2.0,2.0,2.2,0.447213595499958,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Hierarchy & Heading Consistency,3.0,3.0,3.0,4.0,3.0,3.2,0.4472135954999579,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Logical Organization,2.0,2.0,2.0,4.0,2.0,2.4,0.8944271909999159,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Logical Organization,5.0,4.0,5.0,4.0,4.0,4.4,0.5477225575051662,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Redundancy,3.0,2.0,2.0,2.0,3.0,2.4,0.5477225575051662,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Redundancy,4.0,3.0,3.0,3.0,3.0,3.2,0.447213595499958,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Section Balance,4.0,4.0,3.0,4.0,3.0,3.6,0.5477225575051661,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Section Balance,3.0,4.0,3.0,4.0,3.0,3.4,0.5477225575051661,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Sentence Clarity,5.0,5.0,4.0,5.0,4.0,4.6,0.5477225575051661,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Sentence Clarity,5.0,4.0,4.0,4.0,5.0,4.4,0.547722557505166,False,3.3
-Census Bureau2,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,1.0,2.0,2.0,3.0,1.0,1.8,0.8366600265340756,False,3.3
-Census Bureau2,o4-mini-2025-04-16,Table-of-Contents Alignment,3.0,5.0,4.0,5.0,3.0,4.0,1.0,False,3.3
+Census Bureau,gemini-2.5-flash-preview-05-20,Citation Format Consistency,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Citation Format Consistency,3.0,3.0,3.0,2.0,4.0,3.0,0.7071067811865476,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Completeness / Coverage,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,4.0,5.0,5.0,4.8,0.44721359549995804,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Factual Accuracy,5.0,4.0,2.0,4.0,4.0,3.8,1.0954451150103321,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Hierarchy & Heading Consistency,4.0,3.0,3.0,2.0,3.0,3.0,0.7071067811865476,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Logical Organization,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Logical Organization,5.0,4.0,4.0,3.0,4.0,4.0,0.7071067811865475,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Redundancy,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Redundancy,3.0,3.0,3.0,2.0,3.0,2.8,0.4472135954999579,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Section Balance,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Section Balance,4.0,3.0,3.0,2.0,4.0,3.2,0.8366600265340756,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Sentence Clarity,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Sentence Clarity,4.0,4.0,4.0,4.0,5.0,4.2,0.44721359549995787,False,2.9555555555555557
+Census Bureau,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,2.9555555555555557
+Census Bureau,o4-mini-2025-04-16,Table-of-Contents Alignment,4.0,3.0,3.0,2.0,5.0,3.4,1.140175425099138,False,2.9555555555555557
+Census Bureau1,gemini-2.5-flash-preview-05-20,Citation Format Consistency,1.0,2.0,1.0,2.0,1.0,1.4,0.5477225575051661,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Citation Format Consistency,2.0,2.0,3.0,3.0,3.0,2.6,0.5477225575051661,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Completeness / Coverage,4.0,3.0,4.0,3.0,4.0,3.6,0.5477225575051661,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Completeness / Coverage,5.0,4.0,5.0,5.0,5.0,4.8,0.44721359549995787,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,2.0,1.0,2.0,1.0,2.0,1.6,0.5477225575051661,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Hierarchy & Heading Consistency,3.0,2.0,3.0,3.0,3.0,2.8,0.447213595499958,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Logical Organization,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Logical Organization,4.0,3.0,4.0,4.0,3.0,3.6,0.5477225575051662,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Redundancy,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Redundancy,3.0,3.0,3.0,3.0,3.0,3.0,0.0,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Section Balance,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Section Balance,3.0,3.0,3.0,3.0,3.0,3.0,0.0,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Sentence Clarity,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Sentence Clarity,5.0,4.0,5.0,5.0,4.0,4.6,0.547722557505166,False,2.8555555555555556
+Census Bureau1,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,2.0,1.0,2.0,1.0,2.0,1.6,0.5477225575051661,False,2.8555555555555556
+Census Bureau1,o4-mini-2025-04-16,Table-of-Contents Alignment,3.0,2.0,3.0,2.0,4.0,2.8,0.8366600265340756,False,2.8555555555555556
+Census Bureau2,gemini-2.5-flash-preview-05-20,Citation Format Consistency,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Citation Format Consistency,2.0,2.0,2.0,3.0,2.0,2.2,0.4472135954999579,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Completeness / Coverage,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,4.0,5.0,5.0,4.8,0.44721359549995804,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Hierarchy & Heading Consistency,3.0,3.0,3.0,4.0,2.0,3.0,0.7071067811865476,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Logical Organization,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Logical Organization,5.0,5.0,4.0,5.0,4.0,4.6,0.5477225575051661,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Redundancy,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Redundancy,3.0,3.0,3.0,3.0,3.0,3.0,0.0,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Section Balance,3.0,3.0,3.0,3.0,3.0,3.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Section Balance,3.0,3.0,3.0,4.0,3.0,3.2,0.4472135954999579,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Sentence Clarity,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Sentence Clarity,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,3.111111111111111
+Census Bureau2,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,3.111111111111111
+Census Bureau2,o4-mini-2025-04-16,Table-of-Contents Alignment,2.0,3.0,3.0,5.0,3.0,3.2,1.0954451150103324,False,3.111111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Citation Format Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Citation Format Consistency,4.0,4.0,5.0,4.0,4.0,4.2,0.44721359549995804,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Factual Accuracy,5.0,5.0,4.0,4.0,5.0,4.6,0.5477225575051663,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Hierarchy & Heading Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Logical Organization,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Logical Organization,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Redundancy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Redundancy,4.0,4.0,5.0,4.0,4.0,4.2,0.44721359549995804,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Section Balance,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Section Balance,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Sentence Clarity,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Sentence Clarity,5.0,4.0,5.0,5.0,5.0,4.8,0.44721359549995787,False,4.711111111111111
+cencusdp,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp,o4-mini-2025-04-16,Table-of-Contents Alignment,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.711111111111111
+cencusdp3,gemini-2.5-flash-preview-05-20,Citation Format Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Citation Format Consistency,4.0,4.0,5.0,5.0,5.0,4.6,0.5477225575051663,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Factual Accuracy,1.0,1.0,1.0,1.0,1.0,1.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,5.0,4.0,4.0,4.2,0.44721359549995804,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Hierarchy & Heading Consistency,5.0,4.0,4.0,4.0,4.0,4.2,0.44721359549995787,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Logical Organization,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Logical Organization,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Redundancy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Redundancy,5.0,5.0,5.0,4.0,4.0,4.6,0.5477225575051661,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Section Balance,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Section Balance,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Sentence Clarity,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Sentence Clarity,4.0,4.0,5.0,5.0,4.0,4.4,0.5477225575051663,False,4.444444444444445
+cencusdp3,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp3,o4-mini-2025-04-16,Table-of-Contents Alignment,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.444444444444445
+cencusdp4,gemini-2.5-flash-preview-05-20,Citation Format Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Citation Format Consistency,4.0,4.0,3.0,4.0,4.0,3.8,0.4472135954999579,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Completeness / Coverage,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,4.0,5.0,4.0,4.2,0.4472135954999579,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Hierarchy & Heading Consistency,5.0,5.0,5.0,5.0,4.0,4.8,0.44721359549995787,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Logical Organization,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Logical Organization,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Redundancy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Redundancy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Section Balance,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Section Balance,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Sentence Clarity,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Sentence Clarity,4.0,5.0,4.0,5.0,5.0,4.6,0.5477225575051662,False,4.5777777777777775
+cencusdp4,gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+cencusdp4,o4-mini-2025-04-16,Table-of-Contents Alignment,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.5777777777777775
+census bureau (2),gemini-2.5-flash-preview-05-20,Citation Format Consistency,2.0,2.0,2.0,2.0,2.0,2.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Citation Format Consistency,,4.0,3.0,4.0,3.0,3.5,0.5773502691896257,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Completeness / Coverage,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Factual Accuracy,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Factual Accuracy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Hierarchy & Heading Consistency,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Hierarchy & Heading Consistency,,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Logical Organization,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Logical Organization,,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Redundancy,4.0,4.0,4.0,4.0,4.0,4.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Redundancy,,4.0,3.0,4.0,4.0,3.75,0.5,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Section Balance,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Section Balance,,4.0,4.0,4.0,4.0,4.0,0.0,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Sentence Clarity,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Sentence Clarity,,5.0,4.0,4.0,4.0,4.25,0.4999999999999999,False,4.481927710843373
+census bureau (2),gemini-2.5-flash-preview-05-20,Table-of-Contents Alignment,5.0,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373
+census bureau (2),o4-mini-2025-04-16,Table-of-Contents Alignment,,5.0,5.0,5.0,5.0,5.0,0.0,False,4.481927710843373

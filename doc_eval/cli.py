@@ -2,6 +2,9 @@ import typer
 import pandas as pd
 import os
 from sqlalchemy import create_engine, text
+import yaml # Import yaml
+
+import asyncio # Import asyncio
 
 from doc_eval.loaders.text_loader import load_documents_from_folder
 from doc_eval.engine.evaluator import Evaluator
@@ -10,6 +13,13 @@ from doc_eval.engine.elo_calculator import calculate_elo_ratings # Import the ne
 
 app = typer.Typer()
 DB_PATH = 'doc_eval/results.db'
+
+# Load configuration from config.yaml
+CONFIG_PATH = 'doc_eval/config.yaml'
+with open(CONFIG_PATH, 'r') as f:
+    config = yaml.safe_load(f)
+
+MAX_CONCURRENT_LLM_CALLS = config['llm_api']['max_concurrent_llm_calls']
 
 def _clear_table(table_name: str):
     """Clears all data from the specified table."""
@@ -31,7 +41,7 @@ def run_single(
     """
     typer.echo(f"Running single-document evaluations on: {folder_path}")
     _clear_table("single_doc_results") # Clear table before new run
-    evaluator = Evaluator(db_path=DB_PATH)
+    evaluator = Evaluator(db_path=DB_PATH, max_concurrent_llm_calls=MAX_CONCURRENT_LLM_CALLS) # Pass max_concurrent_llm_calls
     
     documents = list(load_documents_from_folder(folder_path))
     if not documents:
@@ -40,7 +50,7 @@ def run_single(
 
     for doc_id, content in documents:
         typer.echo(f"  Evaluating single document: {doc_id}")
-        evaluator.evaluate_single_document(doc_id, content)
+        asyncio.run(evaluator.evaluate_single_document(doc_id, content)) # Use asyncio.run
     
     typer.echo("Single-document evaluations complete.")
 
@@ -83,7 +93,7 @@ def run_pairwise(
     """
     typer.echo(f"Running pairwise evaluations on: {folder_path}")
     _clear_table("pairwise_results") # Clear table before new run
-    evaluator = Evaluator(db_path=DB_PATH)
+    evaluator = Evaluator(db_path=DB_PATH, max_concurrent_llm_calls=MAX_CONCURRENT_LLM_CALLS) # Pass max_concurrent_llm_calls
 
     documents = list(load_documents_from_folder(folder_path))
     if not documents:
@@ -91,7 +101,7 @@ def run_pairwise(
         return
     
     typer.echo(f"  Evaluating {len(documents)} documents in pairwise combinations.")
-    evaluator.evaluate_pairwise_documents(documents)
+    asyncio.run(evaluator.evaluate_pairwise_documents(documents)) # Use asyncio.run
 
     typer.echo("Pairwise evaluations complete.")
 
@@ -235,7 +245,7 @@ def export_pairwise_raw(
         typer.echo(f"Error: Table 'pairwise_results' not found in {DB_PATH}. Please run 'run-pairwise' first.")
         return
     
-    # Drop the 'reason' and 'timestamp' columns as they are not typically needed in raw exports
+    # Drop the 'reason' and 'timestamp' columns as requested
     df_display = df.drop(columns=['reason', 'timestamp'], errors='ignore')
     df_display.to_csv(output_path, index=False)
     typer.echo(f"Raw pairwise results exported to {output_path}")
@@ -264,6 +274,39 @@ def export_pairwise_summary(
     
     summary_df.to_csv(output_path, index=False)
     typer.echo(f"Aggregated pairwise summary exported to {output_path}")
+
+@app.command()
+def run_all_evaluations(
+    folder_path: str = typer.Argument(..., help="Path to the folder containing documents for evaluation.")
+):
+    """
+    Runs both single and pairwise evaluations, then exports and displays summaries.
+    """
+    typer.echo(f"Starting all evaluations for documents in: {folder_path}")
+    
+    # Run single-document evaluations
+    run_single(folder_path)
+    
+    # Run pairwise evaluations
+    run_pairwise(folder_path)
+    
+    typer.echo("\n--- Exporting Summaries ---")
+    # Export single-document summary
+    export_single_summary(output_path="single_doc_summary.csv")
+    
+    # Export pairwise summary
+    export_pairwise_summary(output_path="pairwise_summary.csv")
+    
+    typer.echo("\n--- Displaying Single-Document Summary ---")
+    # Display single-document summary
+    summary_single()
+    
+    typer.echo("\n--- Displaying Pairwise Summary ---")
+    # Display pairwise summary
+    summary_pairwise()
+    
+    typer.echo("\nAll evaluations, exports, and summaries complete.")
+
 
 if __name__ == "__main__":
     app()

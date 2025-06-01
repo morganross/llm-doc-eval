@@ -3,7 +3,7 @@ single_doc_criteria:
   # This description can be used by the LLM to understand the criterion better.
   - name: Factual Accuracy
     scale: 5
-    description: "You MUST use google search or grounding to verify the Accuracy of the claims. You do not currently have up to date information."
+    description: "You MUST use google search grounding tool to verify the Accuracy of the document. You do not currently have up to date information."
   - name: Completeness / Coverage
     scale: 5
     description: "Does the document fully address the stated topic or brief?"
@@ -28,3 +28,7 @@ single_doc_criteria:
   - name: Citation Format Consistency
     scale: 5
     description: "Are all references presented in a single, consistent citation style?"
+
+pairwise_doc_criteria:
+  - name: "preference"
+    description: "Indicate which document is preferred and why, considering all aspects."

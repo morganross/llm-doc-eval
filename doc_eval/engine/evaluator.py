@@ -10,6 +10,7 @@ from itertools import combinations
 from sqlalchemy import create_engine
 import logging
 import time # For exponential backoff
+import asyncio # Import asyncio
 
 from doc_eval.models.registry import get_llm
 import google.genai # Import the new Google GenAI SDK
@@ -19,7 +20,7 @@ from google.genai.types import Tool, GenerateContentConfig, GoogleSearch # Impor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class Evaluator:
-    def __init__(self, config_path='doc_eval/config.yaml', prompts_dir='doc_eval/prompts', db_path='doc_eval/results.db'):
+    def __init__(self, config_path='doc_eval/config.yaml', prompts_dir='doc_eval/prompts', db_path='doc_eval/results.db', max_concurrent_llm_calls: int = 5):
         self.config = self._load_config(config_path)
         self.env = Environment(loader=FileSystemLoader(prompts_dir))
         self.single_doc_template = self.env.get_template('single_doc.jinja')
@@ -28,7 +29,8 @@ class Evaluator:
         self.pairwise_results = pd.DataFrame()
         self.db_engine = create_engine(f'sqlite:///{db_path}')
         self.genai_client = google.genai.Client() # Initialize Google GenAI client
-        logging.info(f"Evaluator initialized with config from {config_path}, prompts from {prompts_dir}, and DB at {db_path}")
+        self.llm_semaphore = asyncio.Semaphore(max_concurrent_llm_calls) # Initialize semaphore
+        logging.info(f"Evaluator initialized with config from {config_path}, prompts from {prompts_dir}, and DB at {db_path} with max_concurrent_llm_calls={max_concurrent_llm_calls}")
 
     def _load_config(self, config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
@@ -77,115 +79,131 @@ class Evaluator:
         parser = JsonOutputParser()
         return llm, parser, model_name, enable_grounding # Return model_name and enable_grounding
 
-    def _run_llm_call(self, llm, parser, prompt_text, model_name, enable_grounding, retries=3):
-        for attempt in range(1, retries + 1):
-            try:
-                response = None
-                if model_name.startswith("gemini-") and enable_grounding:
-                    # Use direct google.genai client for grounding
-                    google_search_tool = Tool(google_search=GoogleSearch())
-                    
-                    # LangChain's prompt_text is a string, need to wrap it for genai client
-                    contents = [{"parts": [{"text": prompt_text}]}]
+    async def _run_llm_call(self, llm, parser, prompt_text, model_name, enable_grounding, retries=3):
+        async with self.llm_semaphore: # Acquire semaphore before making LLM call
+            for attempt in range(1, retries + 1):
+                try:
+                    response = None
+                    if model_name.startswith("gemini-") and enable_grounding:
+                        # Use direct google.genai client for grounding
+                        google_search_tool = Tool(google_search=GoogleSearch())
+                        
+                        # LangChain's prompt_text is a string, need to wrap it for genai client
+                        contents = [{"parts": [{"text": prompt_text}]}]
 
-                    genai_response = self.genai_client.models.generate_content(
-                        model=model_name,
-                        contents=contents,
-                        config=GenerateContentConfig(
-                            tools=[google_search_tool],
-                            response_modalities=["TEXT"],
+                        genai_response = await self.genai_client.models.generate_content( # Await here
+                            model=model_name,
+                            contents=contents,
+                            config=GenerateContentConfig(
+                                tools=[google_search_tool],
+                                response_modalities=["TEXT"],
+                            )
                         )
-                    )
-                    # Extract content and grounding metadata from genai_response
-                    response_content = ""
-                    grounding_metadata = None
-                    if genai_response.candidates and genai_response.candidates[0].content.parts:
-                        for part in genai_response.candidates[0].content.parts:
-                            response_content += part.text
-                        grounding_metadata = genai_response.candidates[0].grounding_metadata
+                        # Extract content and grounding metadata from genai_response
+                        response_content = ""
+                        grounding_metadata = None
+                        if genai_response.candidates and genai_response.candidates[0].content.parts:
+                            for part in genai_response.candidates[0].content.parts:
+                                response_content += part.text
+                            grounding_metadata = genai_response.candidates[0].grounding_metadata
+                        
+                        # Simulate LangChain's BaseMessage structure for consistency with parser
+                        class MockAIMessage:
+                            def __init__(self, content, additional_kwargs=None):
+                                self.content = content
+                                self.additional_kwargs = additional_kwargs if additional_kwargs is not None else {}
+                        
+                        response = MockAIMessage(content=response_content, additional_kwargs={"grounding_metadata": grounding_metadata})
+                        
+                    else:
+                        # Use LangChain's LLM for other models or no grounding
+                        response = await llm.ainvoke(prompt_text) # Await here
                     
-                    # Simulate LangChain's BaseMessage structure for consistency with parser
-                    class MockAIMessage:
-                        def __init__(self, content, additional_kwargs=None):
-                            self.content = content
-                            self.additional_kwargs = additional_kwargs if additional_kwargs is not None else {}
-                    
-                    response = MockAIMessage(content=response_content, additional_kwargs={"grounding_metadata": grounding_metadata})
-                    
-                else:
-                    # Use LangChain's LLM for other models or no grounding
-                    response = llm.invoke(prompt_text)
+                    # Extract grounding metadata if available (from either path)
+                    grounding_metadata = response.additional_kwargs.get("grounding_metadata")
+                    if grounding_metadata:
+                        logging.info(f"  Grounding metadata received: {grounding_metadata}")
+                        # You might want to store this metadata or process it further
+                        # For now, just logging it.
+
+                    # LangChain's parser expects a string, then parses it.
+                    # If the LLM directly returns a dict (e.g., from a mock), handle it.
+                    if isinstance(response, dict):
+                        parsed_response = response
+                    else:
+                        parsed_response = parser.parse(response.content) # Assuming response is a BaseMessage or similar
+
+                    # Basic validation for JSON structure
+                    if isinstance(parsed_response, dict):
+                        logging.info(f"LLM call successful on attempt {attempt}.")
+                        return parsed_response
+                    else:
+                        raise ValueError("Parsed LLM response is not a valid JSON object.")
+                except json.JSONDecodeError as e:
+                    logging.warning(f"JSON decode error on attempt {attempt}: {e}. Retrying...")
+                except Exception as e:
+                    logging.warning(f"LLM call error on attempt {attempt}: {e}. Retrying...")
                 
-                # Extract grounding metadata if available (from either path)
-                grounding_metadata = response.additional_kwargs.get("grounding_metadata")
-                if grounding_metadata:
-                    logging.info(f"  Grounding metadata received: {grounding_metadata}")
-                    # You might want to store this metadata or process it further
-                    # For now, just logging it.
+                if attempt < retries:
+                    sleep_time = 2 ** attempt # Exponential backoff
+                    logging.info(f"Waiting {sleep_time} seconds before retry...")
+                    await asyncio.sleep(sleep_time) # Use asyncio.sleep for async context
+            logging.error(f"Failed LLM call after {retries} attempts.")
+            raise Exception(f"Failed LLM call after {retries} attempts.")
 
-                # LangChain's parser expects a string, then parses it.
-                # If the LLM directly returns a dict (e.g., from a mock), handle it.
-                if isinstance(response, dict):
-                    parsed_response = response
-                else:
-                    parsed_response = parser.parse(response.content) # Assuming response is a BaseMessage or similar
-
-                # Basic validation for JSON structure
-                if isinstance(parsed_response, dict):
-                    logging.info(f"LLM call successful on attempt {attempt}.")
-                    return parsed_response
-                else:
-                    raise ValueError("Parsed LLM response is not a valid JSON object.")
-            except json.JSONDecodeError as e:
-                logging.warning(f"JSON decode error on attempt {attempt}: {e}. Retrying...")
-            except Exception as e:
-                logging.warning(f"LLM call error on attempt {attempt}: {e}. Retrying...")
-            
-            if attempt < retries:
-                sleep_time = 2 ** attempt # Exponential backoff
-                logging.info(f"Waiting {sleep_time} seconds before retry...")
-                time.sleep(sleep_time)
-        logging.error(f"Failed LLM call after {retries} attempts.")
-        raise Exception(f"Failed LLM call after {retries} attempts.")
-
-    def evaluate_single_document(self, doc_id, document_content):
+    async def evaluate_single_document(self, doc_id, document_content):
         model_a_name = self.config['models']['model_a']['name']
         model_b_name = self.config['models']['model_b']['name']
         criteria = self.config['single_doc_eval']['criteria'] # Now loaded from criteria.yaml
         trial_count = self.config['single_doc_eval']['trial_count']
 
         logging.info(f"Starting single-document evaluation for doc_id: {doc_id}")
+        
+        tasks = []
         for model_name in [model_a_name, model_b_name]:
             llm, parser, model_name_from_get_llm, enable_grounding = self._get_llm_and_parser(model_name)
             for trial in range(1, trial_count + 1):
-                logging.info(f"  Evaluating with {model_name}, trial {trial}")
+                logging.info(f"  Creating task for {model_name}, trial {trial}")
                 input_data = {
                     "criteria": criteria,
                     "document": document_content
                 }
                 rendered_prompt = self.single_doc_template.render(input_data)
                 
-                try:
-                    llm_response = self._run_llm_call(llm, parser, rendered_prompt, model_name_from_get_llm, enable_grounding)
-                    for eval_item in llm_response.get('evaluations', []):
-                        row = {
-                            "doc_id": doc_id,
-                            "model": model_name,
-                            "trial": trial,
-                            "criterion": eval_item.get('criterion'),
-                            "score": eval_item.get('score'),
-                            "reason": eval_item.get('reason'),
-                            "timestamp": datetime.now()
-                        }
-                        self.single_doc_results = pd.concat([self.single_doc_results, pd.DataFrame([row])], ignore_index=True)
-                    logging.info(f"  Successfully processed LLM response for {model_name}, trial {trial}.")
-                except Exception as e:
-                    logging.error(f"Error evaluating single document {doc_id} with {model_name} trial {trial}: {e}")
+                tasks.append(self._run_llm_call(llm, parser, rendered_prompt, model_name_from_get_llm, enable_grounding))
+        
+        responses = await asyncio.gather(*tasks, return_exceptions=True) # Run tasks concurrently
+
+        for i, response in enumerate(responses):
+            model_idx = i // trial_count
+            trial_idx = i % trial_count
+            model_name = [model_a_name, model_b_name][model_idx]
+            trial = trial_idx + 1
+
+            if isinstance(response, Exception):
+                logging.error(f"Error in LLM call for {model_name}, trial {trial}: {response}")
+                continue
+
+            try:
+                for eval_item in response.get('evaluations', []):
+                    row = {
+                        "doc_id": doc_id,
+                        "model": model_name,
+                        "trial": trial,
+                        "criterion": eval_item.get('criterion'),
+                        "score": eval_item.get('score'),
+                        "reason": eval_item.get('reason'),
+                        "timestamp": datetime.now()
+                    }
+                    self.single_doc_results = pd.concat([self.single_doc_results, pd.DataFrame([row])], ignore_index=True)
+                logging.info(f"  Successfully processed LLM response for {model_name}, trial {trial}.")
+            except Exception as e:
+                logging.error(f"Error processing response for {model_name}, trial {trial}: {e}")
 
         self._persist_single_doc_results()
         logging.info(f"Finished single-document evaluation for doc_id: {doc_id}")
 
-    def evaluate_pairwise_documents(self, doc_ids_contents):
+    async def evaluate_pairwise_documents(self, doc_ids_contents):
         """
         Evaluates all unique pairs of documents from the provided list.
         doc_ids_contents: list of (doc_id, content) tuples
@@ -199,12 +217,13 @@ class Evaluator:
         all_doc_ids = [doc_id for doc_id, _ in doc_ids_contents]
 
         logging.info("Starting pairwise document evaluation.")
+        
+        tasks = []
         for doc_id_1, doc_id_2 in combinations(all_doc_ids, 2):
-            logging.info(f"  Evaluating pair: {doc_id_1} vs {doc_id_2}")
+            logging.info(f"  Creating tasks for pair: {doc_id_1} vs {doc_id_2}")
             for model_name in [model_a_name, model_b_name]:
                 llm, parser, model_name_from_get_llm, enable_grounding = self._get_llm_and_parser(model_name)
                 for trial in range(1, pairwise_trial_count + 1):
-                    logging.info(f"    Evaluating with {model_name}, trial {trial}")
                     input_data = {
                         "doc_id_1": doc_id_1,
                         "document_1": document_map[doc_id_1],
@@ -214,10 +233,24 @@ class Evaluator:
                     }
                     rendered_prompt = self.pairwise_doc_template.render(input_data)
                     
+                    tasks.append(self._run_llm_call(llm, parser, rendered_prompt, model_name_from_get_llm, enable_grounding))
+        
+        responses = await asyncio.gather(*tasks, return_exceptions=True) # Run tasks concurrently
+
+        task_idx = 0
+        for doc_id_1, doc_id_2 in combinations(all_doc_ids, 2):
+            for model_name in [model_a_name, model_b_name]:
+                for trial in range(1, pairwise_trial_count + 1):
+                    response = responses[task_idx]
+                    task_idx += 1
+
+                    if isinstance(response, Exception):
+                        logging.error(f"Error in LLM call for pair {doc_id_1} vs {doc_id_2} with {model_name} trial {trial}: {response}")
+                        continue
+
                     try:
-                        llm_response = self._run_llm_call(llm, parser, rendered_prompt, model_name_from_get_llm, enable_grounding)
-                        winner_doc_id = llm_response.get('winner_doc_id')
-                        reason = llm_response.get('reason')
+                        winner_doc_id = response.get('winner_doc_id')
+                        reason = response.get('reason')
 
                         # Basic validation for winner_doc_id
                         if winner_doc_id not in [doc_id_1, doc_id_2]:
@@ -235,7 +268,7 @@ class Evaluator:
                         self.pairwise_results = pd.concat([self.pairwise_results, pd.DataFrame([row])], ignore_index=True)
                         logging.info(f"    Successfully processed LLM response for {model_name}, trial {trial}.")
                     except Exception as e:
-                        logging.error(f"Error evaluating pairwise documents {doc_id_1} vs {doc_id_2} with {model_name} trial {trial}: {e}")
+                        logging.error(f"Error processing response for pair {doc_id_1} vs {doc_id_2} with {model_name} trial {trial}: {e}")
 
         self._persist_pairwise_results()
         logging.info("Finished pairwise document evaluation.")
@@ -369,12 +402,14 @@ Return your decision as a JSON object with the following structure:
     if os.path.exists(test_db_path):
         os.remove(test_db_path) # Clean up previous test db
 
-    evaluator = Evaluator(db_path=test_db_path)
+    # Test with a small max_concurrent_llm_calls for demonstration
+    evaluator = Evaluator(db_path=test_db_path, max_concurrent_llm_calls=2)
 
     # Test single document evaluation
     logging.info("\n--- Testing Single Document Evaluation ---")
-    evaluator.evaluate_single_document("test_doc_1", "This is a test document content.")
-    # Results are persisted immediately, so DataFrame should be empty after persist
+    async def run_single_test():
+        await evaluator.evaluate_single_document("test_doc_1", "This is a test document content.")
+    asyncio.run(run_single_test())
     logging.info(f"Single-doc DataFrame empty after persist: {evaluator.single_doc_results.empty}")
 
     # Test pairwise document evaluation
@@ -384,8 +419,9 @@ Return your decision as a JSON object with the following structure:
         ("docB", "Content of document B."),
         ("docC", "Content of document C.")
     ]
-    evaluator.evaluate_pairwise_documents(test_docs_contents)
-    # Results are persisted immediately, so DataFrame should be empty after persist
+    async def run_pairwise_test():
+        await evaluator.evaluate_pairwise_documents(test_docs_contents)
+    asyncio.run(run_pairwise_test())
     logging.info(f"Pairwise DataFrame empty after persist: {evaluator.pairwise_results.empty}")
 
     # Verify data in SQLite (optional, for manual check)
