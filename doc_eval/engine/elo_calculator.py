@@ -60,36 +60,3 @@ def calculate_elo_ratings(db_path='doc_eval/results.db', initial_elo=1200):
     # Convert Rating objects back to float for easier consumption
     final_elo_ratings = {doc_id: float(rating) for doc_id, rating in elo_ratings.items()}
     return final_elo_ratings
-
-if __name__ == '__main__':
-    # Example usage:
-    # This requires a dummy results.db with a pairwise_results table
-    # For testing, you might want to create a dummy DB and populate it
-    # with some sample data.
-
-    # Create a dummy database and table for testing
-    dummy_db_path = 'doc_eval/test_elo_results.db'
-    dummy_engine = create_engine(f'sqlite:///{dummy_db_path}')
-    
-    # Sample pairwise results data
-    sample_data = [
-        {'doc_id_1': 'docA', 'doc_id_2': 'docB', 'winner_doc_id': 'docA', 'model': 'model_x', 'trial': 1, 'reason': 'reason', 'timestamp': '2023-01-01'},
-        {'doc_id_1': 'docB', 'doc_id_2': 'docC', 'winner_doc_id': 'docB', 'model': 'model_x', 'trial': 1, 'reason': 'reason', 'timestamp': '2023-01-01'},
-        {'doc_id_1': 'docA', 'doc_id_2': 'docC', 'winner_doc_id': 'docA', 'model': 'model_x', 'trial': 1, 'reason': 'reason', 'timestamp': '2023-01-01'},
-        {'doc_id_1': 'docA', 'doc_id_2': 'docB', 'winner_doc_id': 'docA', 'model': 'model_y', 'trial': 1, 'reason': 'reason', 'timestamp': '2023-01-01'},
-        {'doc_id_1': 'docB', 'doc_id_2': 'docC', 'winner_doc_id': 'docC', 'model': 'model_y', 'trial': 1, 'reason': 'reason', 'timestamp': '2023-01-01'},
-        {'doc_id_1': 'docA', 'doc_id_2': 'docC', 'winner_doc_id': 'docA', 'model': 'model_y', 'trial': 1, 'reason': 'reason', 'timestamp': '2023-01-01'},
-    ]
-    sample_df = pd.DataFrame(sample_data)
-    sample_df.to_sql("pairwise_results", dummy_engine, if_exists='replace', index=False)
-
-    print(f"Calculating Elo ratings using dummy DB: {dummy_db_path}")
-    elo_scores = calculate_elo_ratings(db_path=dummy_db_path)
-    print("Final Elo Ratings:")
-    for doc_id, elo in elo_scores.items():
-        print(f"  {doc_id}: {elo:.2f}")
-
-    # Clean up dummy DB
-    import os
-    if os.path.exists(dummy_db_path):
-        os.remove(dummy_db_path)
