@@ -18,6 +18,8 @@ from google.genai.types import Tool, GenerateContentConfig, GoogleSearch # Impor
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.getLogger("httpx").setLevel(logging.DEBUG)
+logging.getLogger("openai").setLevel(logging.DEBUG)
 
 class Evaluator:
     def __init__(self, config_path='doc_eval/config.yaml', prompts_dir='doc_eval/prompts', db_path='doc_eval/results.db', max_concurrent_llm_calls: int = 5):
