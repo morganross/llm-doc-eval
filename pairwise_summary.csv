@@ -1,8 +1,4 @@
 doc_id,overall_wins,overall_total_participations,overall_win_rate
-Census Bureau,3,24,12.5
-Census Bureau1,5,24,20.833333333333336
-Census Bureau2,5,24,20.833333333333336
-cencusdp,18,24,75.0
-cencusdp3,22,24,91.66666666666666
-cencusdp4,20,24,83.33333333333334
-census bureau (2),11,24,45.83333333333333
+Census Bureau_run_1,2,8,25.0
+Census Bureau_run_2,4,8,50.0
+Census Bureau_run_3,6,8,75.0

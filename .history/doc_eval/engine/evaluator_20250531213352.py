@@ -54,8 +54,8 @@ class Evaluator:
             if os.path.exists(criteria_file_path):
                 with open(criteria_file_path, 'r', encoding='utf-8') as f:
                     criteria_data = yaml.safe_load(f)
-                # Assuming criteria are under 'pairwise_doc_criteria' key in criteria.yaml
-                config['pairwise_eval']['criteria'] = criteria_data.get('pairwise_doc_criteria', [])
+                # Assuming criteria are under 'single_doc_criteria' key in criteria.yaml (reusing for simplicity)
+                config['pairwise_eval']['criteria'] = criteria_data.get('single_doc_criteria', [])
             else:
                 logging.warning(f"Criteria file not found: {criteria_file_path}. Pairwise criteria will be empty.")
                 config['pairwise_eval']['criteria'] = []

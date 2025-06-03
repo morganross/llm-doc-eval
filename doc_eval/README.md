@@ -70,14 +70,14 @@ Navigate to the `doc_eval/` directory in your terminal to use the CLI commands.
 *   **Run Single-Document Evaluations**:
     Evaluate documents in a specified folder against defined criteria.
     ```bash
-    python cli.py run-single --folder-path /path/to/your/documents
+    python cli.py run-single /path/to/your/documents
     ```
     *Replace `/path/to/your/documents` with the actual path to your document folder.*
 
 *   **Run Pairwise Evaluations**:
     Compare documents in a specified folder in a pairwise manner. The tool will generate all unique pairs (N choose 2 combinations) from the documents.
     ```bash
-    python cli.py run-pairwise --folder-path /path/to/your/documents
+    python cli.py run-pairwise /path/to/your/documents
     ```
 
 ### Viewing Summaries
