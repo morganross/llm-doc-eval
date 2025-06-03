@@ -82,9 +82,9 @@ class Evaluator:
     async def _run_llm_call(self, llm, parser, prompt_text, model_name, enable_grounding, retries=3):
         logging.debug(f"Attempting to acquire semaphore for {model_name}...")
         async with self.llm_semaphore: # Acquire semaphore before making LLM call
-            logging.debug(f"Semaphore acquired for {model_name}. Starting LLM call (attempt {attempt}/{retries})...")
             logging.debug(f"Sending prompt to {model_name}:\n{prompt_text[:500]}...") # Log first 500 chars of prompt
             for attempt in range(1, retries + 1):
+                logging.debug(f"Semaphore acquired for {model_name}. Starting LLM call (attempt {attempt}/{retries})...")
                 try:
                     response = None
                     if model_name.startswith("gemini-") and enable_grounding:
