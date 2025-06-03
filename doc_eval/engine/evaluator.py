@@ -17,7 +17,7 @@ import google.genai # Import the new Google GenAI SDK
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch # Import types for grounding
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class Evaluator:
     def __init__(self, config_path='doc_eval/config.yaml', prompts_dir='doc_eval/prompts', db_path='doc_eval/results.db', max_concurrent_llm_calls: int = 5):
