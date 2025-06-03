@@ -160,11 +160,6 @@ def summary_pairwise():
         for index, row in elo_ranked_df.iterrows():
             typer.echo(f"  {row['doc_id']} ({row['full_path']}): {row['elo_rating']:.2f} Elo, Win Rate: {row['overall_win_rate']:.2f}%")
 
-        # Best file Elo and full path
-        highest_elo_doc = elo_ranked_df.iloc[0]
-        typer.echo(f"\nbest file elo: {highest_elo_doc['elo_rating']:.2f}")
-        typer.echo(f"full path and filename of file with highest elo: {highest_elo_doc['full_path']}")
-
 @app.command()
 def raw_pairwise():
     """
