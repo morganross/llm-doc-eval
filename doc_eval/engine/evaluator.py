@@ -80,7 +80,10 @@ class Evaluator:
         return llm, parser, model_name, enable_grounding # Return model_name and enable_grounding
 
     async def _run_llm_call(self, llm, parser, prompt_text, model_name, enable_grounding, retries=3):
+        logging.debug(f"Attempting to acquire semaphore for {model_name}...")
         async with self.llm_semaphore: # Acquire semaphore before making LLM call
+            logging.debug(f"Semaphore acquired for {model_name}. Starting LLM call (attempt {attempt}/{retries})...")
+            logging.debug(f"Sending prompt to {model_name}:\n{prompt_text[:500]}...") # Log first 500 chars of prompt
             for attempt in range(1, retries + 1):
                 try:
                     response = None
@@ -119,6 +122,8 @@ class Evaluator:
                         # Use LangChain's LLM for other models or no grounding
                         response = await llm.ainvoke(prompt_text) # Await here
                     
+                    logging.debug(f"Received raw response from {model_name}:\n{response.content[:500]}...") # Log first 500 chars of response
+
                     # Extract grounding metadata if available (from either path)
                     grounding_metadata = response.additional_kwargs.get("grounding_metadata")
                     if grounding_metadata:
@@ -136,6 +141,7 @@ class Evaluator:
                     # Basic validation for JSON structure
                     if isinstance(parsed_response, dict):
                         logging.info(f"LLM call successful on attempt {attempt}.")
+                        logging.debug(f"LLM call completed for {model_name}.")
                         return parsed_response
                     else:
                         raise ValueError("Parsed LLM response is not a valid JSON object.")
@@ -143,7 +149,9 @@ class Evaluator:
                     logging.warning(f"JSON decode error on attempt {attempt}: {e}. Retrying...")
                 except Exception as e:
                     logging.warning(f"LLM call error on attempt {attempt}: {e}. Retrying...")
-                
+                finally:
+                    logging.debug(f"Semaphore released for {model_name}.") # Log semaphore release
+
                 if attempt < retries:
                     sleep_time = 2 ** attempt # Exponential backoff
                     logging.info(f"Waiting {sleep_time} seconds before retry...")
