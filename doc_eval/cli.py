@@ -328,4 +328,4 @@ async def run_all_evaluations(
 
 if __name__ == "__main__":
     # Typer commands are now async, so we can run the app directly.
-    app()
+    asyncio.run(app())
