@@ -12,7 +12,7 @@ import logging
 import time # For exponential backoff
 import asyncio # Import asyncio
 
-from doc_eval.models.registry import get_llm
+from models.registry import get_llm
 import google.genai # Import the new Google GenAI SDK
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch # Import types for grounding
 

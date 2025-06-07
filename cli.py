@@ -3,24 +3,24 @@ import pandas as pd
 import os
 from sqlalchemy import create_engine, text
 import yaml # Import yaml
+from typing import Optional # Import Optional
 
 import asyncio # Import asyncio
 
-from doc_eval.loaders.text_loader import load_documents_from_folder
-from doc_eval.engine.evaluator import Evaluator
-from doc_eval.engine.metrics import Metrics
-from doc_eval.engine.elo_calculator import calculate_elo_ratings # Import the new function
+from loaders.text_loader import load_documents_from_folder
+from engine.evaluator import Evaluator
+from engine.metrics import Metrics
+from engine.elo_calculator import calculate_elo_ratings # Import the new function
+from config_loader import load_config # Import load_config
+
+# Load configuration at the very beginning
+config = load_config(cli_file_path=__file__)
 
 app = typer.Typer()
 DB_PATH = 'doc_eval/results.db'
 
 # Global dictionary to store document paths
 DOC_PATHS = {}
-
-# Load configuration from config.yaml
-CONFIG_PATH = 'doc_eval/config.yaml'
-with open(CONFIG_PATH, 'r') as f:
-    config = yaml.safe_load(f)
 
 MAX_CONCURRENT_LLM_CALLS = config['llm_api']['max_concurrent_llm_calls']
 
@@ -36,7 +36,7 @@ def _clear_table(table_name: str):
     typer.echo(f"Cleared table: {table_name}")
 
 @app.command()
-def run_single(
+async def run_single(
     folder_path: str = typer.Argument(..., help="Path to the folder containing documents for single-document evaluation.")
 ):
     """
@@ -44,19 +44,18 @@ def run_single(
     """
     typer.echo(f"Running single-document evaluations on: {folder_path}")
     _clear_table("single_doc_results") # Clear table before new run
-    evaluator = Evaluator(db_path=DB_PATH, max_concurrent_llm_calls=MAX_CONCURRENT_LLM_CALLS) # Pass max_concurrent_llm_calls
-    
-    documents = list(load_documents_from_folder(folder_path))
-    if not documents:
-        typer.echo("No .txt or .md documents found in the specified folder.")
-        return
+    async with Evaluator(db_path=DB_PATH, max_concurrent_llm_calls=MAX_CONCURRENT_LLM_CALLS) as evaluator: # Use async with
+        documents = list(load_documents_from_folder(folder_path))
+        if not documents:
+            typer.echo("No .txt or .md documents found in the specified folder.")
+            return
 
-    for doc_id, content, file_path in documents:
-        DOC_PATHS[doc_id] = file_path # Store the full path
-        typer.echo(f"  Evaluating single document: {doc_id}")
-        asyncio.run(evaluator.evaluate_single_document(doc_id, content)) # Use asyncio.run
-    
-    typer.echo("Single-document evaluations complete.")
+        for doc_id, content, file_path in documents:
+            DOC_PATHS[doc_id] = file_path # Store the full path
+            typer.echo(f"  Evaluating single document: {doc_id}")
+            await evaluator.evaluate_single_document(doc_id, content) # Await here
+        
+        typer.echo("Single-document evaluations complete.")
 
 @app.command()
 def summary_single():
@@ -89,7 +88,7 @@ def summary_single():
     typer.echo(overall_avg_scores_df.to_string()) # New line
 
 @app.command()
-def run_pairwise(
+async def run_pairwise(
     folder_path: str = typer.Argument(..., help="Path to the folder containing documents for pairwise evaluation.")
 ):
     """
@@ -97,21 +96,20 @@ def run_pairwise(
     """
     typer.echo(f"Running pairwise evaluations on: {folder_path}")
     _clear_table("pairwise_results") # Clear table before new run
-    evaluator = Evaluator(db_path=DB_PATH, max_concurrent_llm_calls=MAX_CONCURRENT_LLM_CALLS) # Pass max_concurrent_llm_calls
+    async with Evaluator(db_path=DB_PATH, max_concurrent_llm_calls=MAX_CONCURRENT_LLM_CALLS) as evaluator: # Use async with
+        documents = list(load_documents_from_folder(folder_path))
+        if not documents:
+            typer.echo("No .txt or .md documents found in the specified folder.")
+            return
+        
+        typer.echo(f"  Evaluating {len(documents)} documents in pairwise combinations.")
+        # documents here is a list of (doc_id, content, file_path) tuples
+        # evaluator.evaluate_pairwise_documents expects a list of (doc_id, content) tuples
+        # so we need to pass only doc_id and content
+        documents_for_evaluator = [(doc_id, content) for doc_id, content, _ in documents]
+        await evaluator.evaluate_pairwise_documents(documents_for_evaluator) # Await here
 
-    documents = list(load_documents_from_folder(folder_path))
-    if not documents:
-        typer.echo("No .txt or .md documents found in the specified folder.")
-        return
-    
-    typer.echo(f"  Evaluating {len(documents)} documents in pairwise combinations.")
-    # documents here is a list of (doc_id, content, file_path) tuples
-    # evaluator.evaluate_pairwise_documents expects a list of (doc_id, content) tuples
-    # so we need to pass only doc_id and content
-    documents_for_evaluator = [(doc_id, content) for doc_id, content, _ in documents]
-    asyncio.run(evaluator.evaluate_pairwise_documents(documents_for_evaluator)) # Use asyncio.run
-
-    typer.echo("Pairwise evaluations complete.")
+        typer.echo("Pairwise evaluations complete.")
 
 @app.command()
 def summary_pairwise():
@@ -159,6 +157,11 @@ def summary_pairwise():
         elo_ranked_df = combined_summary_df.sort_values(by='elo_rating', ascending=False)
         for index, row in elo_ranked_df.iterrows():
             typer.echo(f"  {row['doc_id']} ({row['full_path']}): {row['elo_rating']:.2f} Elo, Win Rate: {row['overall_win_rate']:.2f}%")
+
+        # Best file Elo and full path
+        highest_elo_doc = elo_ranked_df.iloc[0]
+        typer.echo(f"\nbest file elo: {highest_elo_doc['elo_rating']:.2f}")
+        typer.echo(f"full path and filename of file with highest elo: {highest_elo_doc['full_path']}")
 
 @app.command()
 def raw_pairwise():
@@ -283,19 +286,27 @@ def export_pairwise_summary(
     typer.echo(f"Aggregated pairwise summary exported to {output_path}")
 
 @app.command()
-def run_all_evaluations(
-    folder_path: str = typer.Argument(..., help="Path to the folder containing documents for evaluation.")
+async def run_all_evaluations(
+    folder_path: str = typer.Argument(..., help="Path to the folder containing documents for evaluation."),
+    config_path: Optional[str] = typer.Option(None, help="Path to a custom configuration file.")
 ):
     """
     Runs both single and pairwise evaluations, then exports and displays summaries.
     """
+    # Reload config if a custom path is provided
+    global config
+    if config_path:
+        config = load_config(cli_file_path=__file__, manual_path=config_path)
+        global MAX_CONCURRENT_LLM_CALLS
+        MAX_CONCURRENT_LLM_CALLS = config['llm_api']['max_concurrent_llm_calls']
+
     typer.echo(f"Starting all evaluations for documents in: {folder_path}")
     
     # Run single-document evaluations
-    run_single(folder_path)
+    await run_single(folder_path)
     
     # Run pairwise evaluations
-    run_pairwise(folder_path)
+    await run_pairwise(folder_path)
     
     typer.echo("\n--- Exporting Summaries ---")
     # Export single-document summary
@@ -316,4 +327,5 @@ def run_all_evaluations(
 
 
 if __name__ == "__main__":
-    app()
+    # Typer commands are now async, so we can run the app directly.
+    asyncio.run(app())

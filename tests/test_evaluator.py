@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import sqlite3
 # from unittest.mock import patch, MagicMock # No longer needed for mocking get_llm
-from doc_eval.engine.evaluator import Evaluator
+from engine.evaluator import Evaluator
 # from langchain_core.language_models.chat_models import BaseChatModel # No longer needed for MockLLM
 # from pydantic import ConfigDict # No longer needed for MockLLM
 from sqlalchemy import create_engine # Import create_engine for persistence tests
