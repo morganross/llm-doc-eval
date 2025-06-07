@@ -8,3 +8,4 @@ pytest
 langchain-google-genai
 google-genai
 langchain-google-community
+python-elo
