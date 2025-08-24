@@ -1,5 +1,7 @@
 mb add judges framework
 
+nath to find best document, math to find best llm for generation, math to find best llm for eval.
+
 # LLM Document Evaluation Tool
 
 This tool provides a robust and flexible framework for evaluating documents using Large Language Models (LLMs). It supports two primary evaluation modes:
