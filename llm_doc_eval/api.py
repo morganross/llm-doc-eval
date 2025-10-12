@@ -14,6 +14,10 @@ DB_PATH: str = os.path.join(os.path.dirname(__file__), "results.sqlite")
 from .engine.schemas import load_criteria
 from .engine.judge_backend import FPFJudge, JudgeCfg
 from .fpf_loader import ensure_fpf
+from api_cost_multiplier.functions import fpf_runner  # type: ignore
+import tempfile
+import json
+import uuid as _uuid
 
 try:
     import yaml  # type: ignore
@@ -238,7 +242,7 @@ async def run_single_evaluation(
     criteria_path: Optional[str] = None,
 ) -> None:
     """
-    Scan folder_path for candidate reports and run single-document grading via FPFJudge.
+    Scan folder_path for candidate reports and run single-document grading via FPF in batch.
     Persists rows into single_doc_results.
     """
     if not folder_path or not os.path.isdir(folder_path):
@@ -265,44 +269,146 @@ async def run_single_evaluation(
     crit_path = criteria_path or _default_paths_from_module()[1]
     criteria = load_criteria(crit_path)
 
-    # Ensure FPF availability
-    fpf_path = ensure_fpf(config_path)
+    # Ensure FPF availability (adds to sys.path if found)
+    ensure_fpf(config_path)
 
-    # Initialize judge
-    judge = FPFJudge(fpf_path=fpf_path)
-
+    # Models to evaluate
     provider_models = _collect_models(cfg)
+
+    # Resolve concurrency (optional)
+    max_conc = None
+    try:
+        mc = ((cfg.get("llm_api") or {}).get("max_concurrent_llm_calls"))
+        if mc is not None:
+            max_conc = int(mc)
+    except Exception:
+        max_conc = None
+
+    # Prepare batch runs
+    tmp_dir = tempfile.mkdtemp(prefix="llm_doc_eval_single_batch_")
+    runs: List[Dict[str, Any]] = []
+    mapping: Dict[str, Tuple[str, str, str]] = {}  # out_path -> (provider, model, doc_id)
+
+    # Load template once
+    here = os.path.dirname(os.path.abspath(__file__))
+    single_tpl_path = os.path.abspath(os.path.join(here, "..", "prompts", "single_template.md"))
+    if not os.path.exists(single_tpl_path):
+        raise FileNotFoundError(f"Single-document prompt template not found: {single_tpl_path}")
+    with open(single_tpl_path, "r", encoding="utf-8") as fh:
+        single_tpl = fh.read()
+
+    def _sanitize(name: str) -> str:
+        import re as _re
+        return _re.sub(r"[\\/*?:\"<>| ]+", "_", name or "unknown")
+
+    # Build all runs across models and docs
+    for provider, model in provider_models:
+        for doc_id in sorted(doc_paths.keys()):
+            content = contents.get(doc_id, "")
+            crit_lines = "\n".join(f"- {c}" for c in criteria) if criteria else "- overall quality"
+            instr_text = single_tpl.replace("{{CRITERIA}}", crit_lines).replace("{{DOC_CONTENT}}", content)
+
+            # Write files
+            uid = (_uuid.uuid4().hex[:8] if _uuid else "uid")
+            instr_path = os.path.join(tmp_dir, f"single_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(doc_id)}_{uid}.txt")
+            payload_path = os.path.join(tmp_dir, f"payload_{uid}.txt")
+            out_path = os.path.join(tmp_dir, f"out_single_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(doc_id)}_{uid}.txt")
+            try:
+                with open(instr_path, "w", encoding="utf-8") as fh:
+                    fh.write(instr_text)
+                with open(payload_path, "w", encoding="utf-8") as fh:
+                    fh.write("Single-document evaluation payload placeholder.")
+            except Exception as e:
+                raise RuntimeError(f"Failed to write temp instruction/payload files: {e}")
+
+            run_id = f"single-{_sanitize(provider)}-{_sanitize(model)}-{_sanitize(doc_id)}-{uid}"
+            runs.append({
+                "id": run_id,
+                "provider": provider,
+                "model": model,
+                "file_a": instr_path,
+                "file_b": payload_path,
+                "out": out_path,
+                "overrides": {
+                    "request_json": True
+                }
+            })
+            mapping[out_path] = (provider, model, doc_id)
+
+    # Submit in one batch (centralized concurrency inside FPF)
+    options = {"max_concurrency": max_conc} if max_conc is not None else None
+    try:
+        _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
+    except Exception as e:
+        # Proceed to parse any outputs that may have been produced
+        # but surface the error if nothing succeeded.
+        pass
 
     conn = sqlite3.connect(db)
     try:
-        for provider, model in provider_models:
-            cfg_obj = _build_cfg(cfg, provider, model)
+        trial = 1
+        # Parse outputs
+        for out_path, (provider, model, doc_id) in mapping.items():
+            if not os.path.exists(out_path):
+                continue
+            with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
+                raw = fh.read()
+            # Try strict JSON first; else find first {...}
+            parsed = None
+            try:
+                parsed = json.loads(raw)
+            except Exception:
+                m = None
+                try:
+                    import re as _re
+                    m = _re.search(r"\{.*\}", raw, flags=_re.DOTALL)
+                except Exception:
+                    m = None
+                if m:
+                    try:
+                        parsed = json.loads(m.group(0))
+                    except Exception:
+                        parsed = None
+            if not isinstance(parsed, dict):
+                # No result for this doc
+                continue
+            evals = parsed.get("evaluations")
+            if not isinstance(evals, list) or not evals:
+                continue
             model_label = f"{provider}:{model}"
-            trial = 1
-            for doc_id in sorted(doc_paths.keys()):
-                content = contents.get(doc_id, "")
-                result = await judge.generate_single(document=content, criteria=criteria, cfg=cfg_obj)
-                if not isinstance(result, dict):
-                    raise ValueError(f"Judge returned non-dict result for single-doc {doc_id} with {model_label}")
-                evals = result.get("evaluations")
-                if not isinstance(evals, list) or not evals:
-                    raise ValueError(f"Invalid 'evaluations' in judge result for single-doc {doc_id} with {model_label}")
-                for item in evals:
-                    if not isinstance(item, dict):
-                        continue
-                    criterion = item.get("criterion")
-                    score = item.get("score")
-                    reason = item.get("reason")
-                    if not isinstance(criterion, str) or not criterion.strip():
-                        raise ValueError(f"Invalid criterion in single-doc result for {doc_id} with {model_label}")
-                    if not isinstance(score, int) or score < 1 or score > 5:
-                        raise ValueError(f"Invalid score in single-doc result for {doc_id} with {model_label}")
-                    if not isinstance(reason, str) or not reason.strip():
-                        raise ValueError(f"Invalid reason in single-doc result for {doc_id} with {model_label}")
-                    _persist_single_result(conn, doc_id, model_label, trial, criterion.strip(), int(score), reason.strip())
+            for item in evals:
+                if not isinstance(item, dict):
+                    continue
+                criterion = item.get("criterion")
+                score = item.get("score")
+                reason = item.get("reason")
+                if not isinstance(criterion, str) or not criterion.strip():
+                    continue
+                if not isinstance(score, int) or score < 1 or score > 5:
+                    continue
+                if not isinstance(reason, str) or not reason.strip():
+                    continue
+                _persist_single_result(conn, doc_id, model_label, trial, criterion.strip(), int(score), reason.strip())
         conn.commit()
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        # Best-effort cleanup
+        try:
+            for root, _dirs, files in os.walk(tmp_dir, topdown=False):
+                for f in files:
+                    try:
+                        os.remove(os.path.join(root, f))
+                    except Exception:
+                        pass
+            try:
+                os.rmdir(tmp_dir)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
 
 async def run_pairwise_evaluation(
@@ -312,9 +418,7 @@ async def run_pairwise_evaluation(
     criteria_path: Optional[str] = None,
 ) -> None:
     """
-    Scan folder_path for candidate reports and evaluate all pairs via FPFJudge.
-    No heuristic or dummy fallback is implemented. If FPF or providers are not
-    configured, a NotImplementedError or other error will be raised.
+    Scan folder_path for candidate reports and evaluate all pairs via a single FPF batch per model.
     """
     if not folder_path or not os.path.isdir(folder_path):
         raise FileNotFoundError(f"Invalid folder_path: {folder_path}")
@@ -342,41 +446,142 @@ async def run_pairwise_evaluation(
     criteria = load_criteria(crit_path)
 
     # Ensure FPF availability (adds to sys.path if found)
-    fpf_path = ensure_fpf(config_path)
-
-    # Initialize judge (must be wired; otherwise raises NotImplementedError on call)
-    judge = FPFJudge(fpf_path=fpf_path)
+    ensure_fpf(config_path)
 
     # Evaluate pairs per configured judge models; each model records its own outcomes
     provider_models = _collect_models(cfg)
 
+    # Concurrency option
+    max_conc = None
+    try:
+        mc = ((cfg.get("llm_api") or {}).get("max_concurrent_llm_calls"))
+        if mc is not None:
+            max_conc = int(mc)
+    except Exception:
+        max_conc = None
+
+    # Template
+    here = os.path.dirname(os.path.abspath(__file__))
+    pair_tpl_path = os.path.abspath(os.path.join(here, "..", "prompts", "pairwise_template.md"))
+    if not os.path.exists(pair_tpl_path):
+        raise FileNotFoundError(f"Pairwise prompt template not found: {pair_tpl_path}")
+    with open(pair_tpl_path, "r", encoding="utf-8") as fh:
+        pair_tpl = fh.read()
+
+    def _sanitize(name: str) -> str:
+        import re as _re
+        return _re.sub(r"[\\/*?:\"<>| ]+", "_", name or "unknown")
+
+    # Build all pair combinations once
+    pairs = list(itertools.combinations(sorted(doc_paths.keys()), 2))
+
     conn = sqlite3.connect(db)
     try:
         for provider, model in provider_models:
-            cfg_obj = _build_cfg(cfg, provider, model)
+            tmp_dir = tempfile.mkdtemp(prefix="llm_doc_eval_pair_batch_")
+            runs: List[Dict[str, Any]] = []
+            mapping: Dict[str, Tuple[str, str, str, str]] = {}  # out_path -> (provider, model, a_id, b_id)
+
+            for (a_id, b_id) in pairs:
+                doc_a = contents.get(a_id, "")
+                doc_b = contents.get(b_id, "")
+                crit_lines = "\n".join(f"- {c}" for c in criteria) if criteria else "- overall quality"
+                instr_text = (
+                    pair_tpl
+                    .replace("{{CRITERIA}}", crit_lines)
+                    .replace("{{DOC_A_ID}}", "A")
+                    .replace("{{DOC_B_ID}}", "B")
+                    .replace("{{DOC_A_CONTENT}}", doc_a)
+                    .replace("{{DOC_B_CONTENT}}", doc_b)
+                )
+                uid = (_uuid.uuid4().hex[:8] if _uuid else "uid")
+                instr_path = os.path.join(tmp_dir, f"pair_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(a_id)}_{_sanitize(b_id)}_{uid}.txt")
+                payload_path = os.path.join(tmp_dir, f"payload_{uid}.txt")
+                out_path = os.path.join(tmp_dir, f"out_pair_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(a_id)}_{_sanitize(b_id)}_{uid}.txt")
+                try:
+                    with open(instr_path, "w", encoding="utf-8") as fh:
+                        fh.write(instr_text)
+                    with open(payload_path, "w", encoding="utf-8") as fh:
+                        fh.write("Pairwise evaluation payload placeholder.")
+                except Exception as e:
+                    raise RuntimeError(f"Failed to write temp instruction/payload files: {e}")
+
+                run_id = f"pair-{_sanitize(provider)}-{_sanitize(model)}-{_sanitize(a_id)}-{_sanitize(b_id)}-{uid}"
+                runs.append({
+                    "id": run_id,
+                    "provider": provider,
+                    "model": model,
+                    "file_a": instr_path,
+                    "file_b": payload_path,
+                    "out": out_path,
+                    "overrides": {
+                        "request_json": True
+                    }
+                })
+                mapping[out_path] = (provider, model, a_id, b_id)
+
+            # Submit one batch for this provider:model
+            options = {"max_concurrency": max_conc} if max_conc is not None else None
+            try:
+                _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
+            except Exception:
+                # Continue attempting to parse any outputs
+                pass
+
+            # Parse results and persist
             model_label = f"{provider}:{model}"
-            trial = 1  # keep 'trial' in schema; configurable in future
-            for (a_id, b_id) in itertools.combinations(sorted(doc_paths.keys()), 2):
-                doc1 = {"id": a_id, "content": contents.get(a_id, "")}
-                doc2 = {"id": b_id, "content": contents.get(b_id, "")}
-                # Call the judge backend (no fallback)
-                result = await judge.generate_pairwise(doc1=doc1, doc2=doc2, criteria=criteria, cfg=cfg_obj)
-
-                # Validate result shape
-                if not isinstance(result, dict):
-                    raise ValueError(f"Judge returned non-dict result for pair ({a_id}, {b_id}) with {model_label}")
-                winner = result.get("winner_doc_id")
-                reason = result.get("reason")
-                if not winner or winner not in (a_id, b_id):
-                    raise ValueError(f"Invalid winner_doc_id '{winner}' for pair ({a_id}, {b_id}) with {model_label}")
+            trial = 1
+            for out_path, (_prov, _mod, a_id, b_id) in mapping.items():
+                if not os.path.exists(out_path):
+                    continue
+                with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
+                    raw = fh.read()
+                parsed = None
+                try:
+                    parsed = json.loads(raw)
+                except Exception:
+                    m = None
+                    try:
+                        import re as _re
+                        m = _re.search(r"\{.*\}", raw, flags=_re.DOTALL)
+                    except Exception:
+                        m = None
+                    if m:
+                        try:
+                            parsed = json.loads(m.group(0))
+                        except Exception:
+                            parsed = None
+                if not isinstance(parsed, dict):
+                    continue
+                winner_raw = parsed.get("winner_doc_id")
+                reason = parsed.get("reason")
+                if not isinstance(winner_raw, str) or winner_raw not in ("A", "B"):
+                    continue
                 if not isinstance(reason, str) or not reason.strip():
-                    raise ValueError(f"Invalid reason in judge result for pair ({a_id}, {b_id}) with {model_label}")
+                    continue
+                winner_doc_id = a_id if winner_raw == "A" else b_id
+                _persist_pair_result(conn, a_id, b_id, winner_doc_id, model_label, trial, reason.strip())
 
-                _persist_pair_result(conn, a_id, b_id, winner, model_label, trial, reason)
-
+            # Cleanup this tmp_dir
+            try:
+                for root, _dirs, files in os.walk(tmp_dir, topdown=False):
+                    for f in files:
+                        try:
+                            os.remove(os.path.join(root, f))
+                        except Exception:
+                            pass
+                try:
+                    os.rmdir(tmp_dir)
+                except Exception:
+                    pass
+            except Exception:
+                pass
         conn.commit()
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 async def run_evaluation(

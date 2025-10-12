@@ -6,9 +6,9 @@ Return exactly:
 { "winner_doc_id": "<A_or_B>", "reason": "<short explanation>" }
 
 Rules:
-- Consider only the provided document content.
+- Base your judgment primarily on the provided document content, but you must perform live web search using the provided tools to verify key factual claims for both Doc A and Doc B. Verification is mandatory.
 - Use the criteria below to inform your judgement.
-- Do not include any content from outside the provided text.
+- Do not include raw URLs or citations in the returned JSON; citations may appear in your internal tool use/working but not in the JSON output.
 - Do not add any extra fields to the JSON.
 - The value of "winner_doc_id" must be either "A" or "B".
 

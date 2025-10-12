@@ -17,17 +17,17 @@ retries:
 models:
   model_a:
     provider: openai
-    model: gpt-4.1-mini
+    model: gpt-5-mini
   model_b:
     provider: google
     model: gemini-2.5-flash
 
 single_doc_eval:
-  trial_count: 1
+  trial_count: 2
   criteria_file: criteria.yaml
 
 pairwise_eval:
-  trial_count: 1
+  trial_count: 2
   criteria_file: criteria.yaml
 
 
