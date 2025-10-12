@@ -1,20 +1,39 @@
-# doc_eval/config.yaml
+# llm-doc-eval configuration (bootstrap defaults; used when FPF wiring is enabled)
+fpf:
+  path: ""  # optional; if empty, resolver will default to ../FilePromptForge
+
 llm_api:
+  max_concurrent_llm_calls: 4
+  timeout_seconds: 120
 
-  max_concurrent_llm_calls: 15 # Master switch for controlling the rate of LLM API calls
+retries:
+  attempts: 3
+  base_delay_seconds: 2
+  max_delay_seconds: 10
+  jitter: true
 
-single_doc_eval:
-  trial_count: 5 # Number of times to run single document evaluation for each document
-  criteria_file: criteria.yaml # Add this line
 
-pairwise_eval:
-  trial_count: 2 # Number of times to run pairwise evaluation for each pair of documents
-  criteria_file: criteria.yaml # Add this line
 
 models:
   model_a:
-    name: o4-mini-2025-04-16
     provider: openai
+    model: gpt-4.1-mini
   model_b:
-    name: gemini-2.5-flash-preview-05-20
     provider: google
+    model: gemini-2.5-flash
+
+single_doc_eval:
+  trial_count: 1
+  criteria_file: criteria.yaml
+
+pairwise_eval:
+  trial_count: 1
+  criteria_file: criteria.yaml
+
+
+# Evaluation mode selection (optional)
+# - single: run only single-document graded evaluation
+# - pairwise: run only pairwise comparisons
+# - both: run single first, then pairwise
+evaluation:
+  mode: both
