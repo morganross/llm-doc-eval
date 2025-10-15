@@ -3,7 +3,7 @@ fpf:
   path: ""  # optional; if empty, resolver will default to ../FilePromptForge
 
 llm_api:
-  max_concurrent_llm_calls: 4
+  max_concurrent_llm_calls: 32
   timeout_seconds: 120
 
 retries:
@@ -23,11 +23,11 @@ models:
     model: gemini-2.5-flash
 
 single_doc_eval:
-  trial_count: 2
+  trial_count: 1
   criteria_file: criteria.yaml
 
 pairwise_eval:
-  trial_count: 2
+  trial_count: 1
   criteria_file: criteria.yaml
 
 

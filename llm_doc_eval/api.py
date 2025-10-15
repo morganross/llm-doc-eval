@@ -336,7 +336,7 @@ async def run_single_evaluation(
             mapping[out_path] = (provider, model, doc_id)
 
     # Submit in one batch (centralized concurrency inside FPF)
-    options = {"max_concurrency": max_conc} if max_conc is not None else None
+    options = {"max_concurrency": max_conc, "json": True} if max_conc is not None else {"json": True}
     try:
         _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
     except Exception as e:
@@ -521,7 +521,7 @@ async def run_pairwise_evaluation(
                 mapping[out_path] = (provider, model, a_id, b_id)
 
             # Submit one batch for this provider:model
-            options = {"max_concurrency": max_conc} if max_conc is not None else None
+            options = {"max_concurrency": max_conc, "json": True} if max_conc is not None else {"json": True}
             try:
                 _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
             except Exception:
