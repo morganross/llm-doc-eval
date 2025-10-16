@@ -1,0 +1,22 @@
+{
+  "run_group_id": "641f8a4f029b4ce2b6c9d2ee228f4327",
+  "count": 3,
+  "total_cost_usd": 0.016452,
+  "by_model_provider": {
+    "openai:gemini-2.5-pro": 0.016452
+  },
+  "items": [
+    {
+      "path": "C:\\Users\\kjhgf\\AppData\\Local\\Temp\\llm_doc_eval_single_logs_641f8a4f029b4ce2b6c9d2ee228f4327\\641f8a4f029b4ce2b6c9d2ee228f4327\\20251016T122435-e704c03b.json",
+      "total_cost_usd": 0.005015
+    },
+    {
+      "path": "C:\\Users\\kjhgf\\AppData\\Local\\Temp\\llm_doc_eval_single_logs_641f8a4f029b4ce2b6c9d2ee228f4327\\641f8a4f029b4ce2b6c9d2ee228f4327\\20251016T122438-33ec2fe7.json",
+      "total_cost_usd": 0.00517
+    },
+    {
+      "path": "C:\\Users\\kjhgf\\AppData\\Local\\Temp\\llm_doc_eval_single_logs_641f8a4f029b4ce2b6c9d2ee228f4327\\641f8a4f029b4ce2b6c9d2ee228f4327\\20251016T122457-aaaa14d2.json",
+      "total_cost_usd": 0.006267
+    }
+  ]
+}

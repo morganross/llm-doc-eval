@@ -177,6 +177,71 @@ def _compute_elo_from_db(db_path: str, k_factor: float = 32.0, initial: float = 
     return ratings
 
 
+def _aggregate_fpf_costs(log_dir: str, run_group_id: str) -> Dict[str, Any]:
+    """
+    Sum total_cost_usd across FPF consolidated logs for a given run_group_id.
+    Expects logs to be written under log_dir/<run_group_id>/**/*.json.
+    """
+    summary: Dict[str, Any] = {
+        "run_group_id": run_group_id,
+        "count": 0,
+        "total_cost_usd": 0.0,
+        "by_model_provider": {},
+        "items": [],
+    }
+    if not log_dir or not run_group_id:
+        return summary
+
+    group_root = os.path.join(log_dir, run_group_id)
+    if not os.path.isdir(group_root):
+        return summary
+
+    for root, _dirs, files in os.walk(group_root):
+        for f in files:
+            if not f.lower().endswith(".json"):
+                continue
+            fp = os.path.join(root, f)
+            try:
+                with open(fp, "r", encoding="utf-8") as fh:
+                    obj = json.load(fh)
+                # Prefer top-level total_cost_usd; fallback to cost.total_cost_usd
+                cost_val = obj.get("total_cost_usd")
+                if cost_val is None and isinstance(obj.get("cost"), dict):
+                    cost_val = obj["cost"].get("total_cost_usd")
+                if cost_val is None:
+                    continue
+                try:
+                    c = float(cost_val)
+                except Exception:
+                    continue
+                summary["total_cost_usd"] += c
+                summary["count"] += 1
+                # Provider and model are recorded in the consolidated object
+                prov = None
+                try:
+                    cfg = obj.get("config") or {}
+                    prov = (cfg.get("provider") or "").strip()
+                except Exception:
+                    prov = None
+                model = obj.get("model")
+                key = f"{prov}:{model}"
+                summary["by_model_provider"].setdefault(key, 0.0)
+                summary["by_model_provider"][key] += c
+                summary["items"].append({"path": fp, "total_cost_usd": c})
+            except Exception:
+                continue
+
+    # Round floats for readability
+    summary["total_cost_usd"] = round(float(summary["total_cost_usd"]), 6)
+    try:
+        summary["by_model_provider"] = {
+            k: round(float(v), 6) for k, v in summary["by_model_provider"].items()
+        }
+    except Exception:
+        pass
+    return summary
+
+
 def _default_paths_from_module() -> Tuple[str, str]:
     """
     Resolve default config.yaml and criteria.yaml relative to package root.
@@ -286,6 +351,10 @@ async def run_single_evaluation(
 
     # Prepare batch runs
     tmp_dir = tempfile.mkdtemp(prefix="llm_doc_eval_single_batch_")
+    # Grouping for FPF logs and cost aggregation (eval → FPF only)
+    run_group_id = _uuid.uuid4().hex
+    fpf_logs_dir = os.path.join(tempfile.gettempdir(), f"llm_doc_eval_single_logs_{run_group_id}")
+    os.makedirs(fpf_logs_dir, exist_ok=True)
     runs: List[Dict[str, Any]] = []
     mapping: Dict[str, Tuple[str, str, str]] = {}  # out_path -> (provider, model, doc_id)
 
@@ -336,7 +405,10 @@ async def run_single_evaluation(
             mapping[out_path] = (provider, model, doc_id)
 
     # Submit in one batch (centralized concurrency inside FPF)
-    options = {"max_concurrency": max_conc, "json": True} if max_conc is not None else {"json": True}
+    base_opts: Dict[str, Any] = {"json": True, "run_group_id": run_group_id, "fpf_log_dir": fpf_logs_dir}
+    if max_conc is not None:
+        base_opts["max_concurrency"] = max_conc
+    options = base_opts
     try:
         _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
     except Exception as e:
@@ -390,6 +462,17 @@ async def run_single_evaluation(
                     continue
                 _persist_single_result(conn, doc_id, model_label, trial, criterion.strip(), int(score), reason.strip())
         conn.commit()
+
+        # Aggregate per-runs cost from FPF logs and persist summary
+        try:
+            summary = _aggregate_fpf_costs(fpf_logs_dir, run_group_id)
+            summaries_dir = os.path.join(os.path.dirname(DB_PATH), "fpf_run_summaries")
+            os.makedirs(summaries_dir, exist_ok=True)
+            out_summary = os.path.join(summaries_dir, f"single_{run_group_id}.json")
+            with open(out_summary, "w", encoding="utf-8") as fh:
+                json.dump(summary, fh, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
     finally:
         try:
             conn.close()
@@ -477,6 +560,11 @@ async def run_pairwise_evaluation(
 
     conn = sqlite3.connect(db)
     try:
+        # Grouping for FPF logs and cost aggregation (eval → FPF only)
+        run_group_id = _uuid.uuid4().hex
+        fpf_logs_dir = os.path.join(tempfile.gettempdir(), f"llm_doc_eval_pair_logs_{run_group_id}")
+        os.makedirs(fpf_logs_dir, exist_ok=True)
+
         for provider, model in provider_models:
             tmp_dir = tempfile.mkdtemp(prefix="llm_doc_eval_pair_batch_")
             runs: List[Dict[str, Any]] = []
@@ -521,7 +609,10 @@ async def run_pairwise_evaluation(
                 mapping[out_path] = (provider, model, a_id, b_id)
 
             # Submit one batch for this provider:model
-            options = {"max_concurrency": max_conc, "json": True} if max_conc is not None else {"json": True}
+            base_opts: Dict[str, Any] = {"json": True, "run_group_id": run_group_id, "fpf_log_dir": fpf_logs_dir}
+            if max_conc is not None:
+                base_opts["max_concurrency"] = max_conc
+            options = base_opts
             try:
                 _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
             except Exception:
@@ -577,6 +668,17 @@ async def run_pairwise_evaluation(
             except Exception:
                 pass
         conn.commit()
+
+        # Aggregate per-runs cost from FPF logs and persist summary
+        try:
+            summary = _aggregate_fpf_costs(fpf_logs_dir, run_group_id)
+            summaries_dir = os.path.join(os.path.dirname(DB_PATH), "fpf_run_summaries")
+            os.makedirs(summaries_dir, exist_ok=True)
+            out_summary = os.path.join(summaries_dir, f"pair_{run_group_id}.json")
+            with open(out_summary, "w", encoding="utf-8") as fh:
+                json.dump(summary, fh, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
     finally:
         try:
             conn.close()
