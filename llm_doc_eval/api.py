@@ -305,7 +305,7 @@ async def run_single_evaluation(
     db_path: Optional[str] = None,
     config_path: Optional[str] = None,
     criteria_path: Optional[str] = None,
-) -> None:
+) -> Optional[Dict[str, Any]]:
     """
     Scan folder_path for candidate reports and run single-document grading via FPF in batch.
     Persists rows into single_doc_results.
@@ -416,6 +416,7 @@ async def run_single_evaluation(
         # but surface the error if nothing succeeded.
         pass
 
+    summary: Optional[Dict[str, Any]] = None
     conn = sqlite3.connect(db)
     try:
         trial = 1
@@ -492,6 +493,7 @@ async def run_single_evaluation(
                 pass
         except Exception:
             pass
+        return summary
 
 
 async def run_pairwise_evaluation(
@@ -499,7 +501,7 @@ async def run_pairwise_evaluation(
     db_path: Optional[str] = None,
     config_path: Optional[str] = None,
     criteria_path: Optional[str] = None,
-) -> None:
+) -> Optional[Dict[str, Any]]:
     """
     Scan folder_path for candidate reports and evaluate all pairs via a single FPF batch per model.
     """
@@ -558,6 +560,7 @@ async def run_pairwise_evaluation(
     # Build all pair combinations once
     pairs = list(itertools.combinations(sorted(doc_paths.keys()), 2))
 
+    summary: Optional[Dict[str, Any]] = None
     conn = sqlite3.connect(db)
     try:
         # Grouping for FPF logs and cost aggregation (eval → FPF only)
@@ -684,6 +687,7 @@ async def run_pairwise_evaluation(
             conn.close()
         except Exception:
             pass
+    return summary
 
 
 async def run_evaluation(
@@ -692,7 +696,7 @@ async def run_evaluation(
     db_path: Optional[str] = None,
     config_path: Optional[str] = None,
     criteria_path: Optional[str] = None,
-) -> None:
+) -> Dict[str, Any]:
     """
     Wrapper to run evaluation in single, pairwise, or both modes.
     - mode="single": runs single-document grading only
@@ -708,15 +712,47 @@ async def run_evaluation(
     else:
         m = m_in
 
+    totals: List[float] = []
+    result: Dict[str, Any] = {"mode": m, "total_cost_usd": 0.0}
+
     if m == "single":
-        await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        s = await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        if isinstance(s, dict):
+            try:
+                totals.append(float(s.get("total_cost_usd") or 0.0))
+            except Exception:
+                pass
     elif m == "pairwise":
-        await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        p = await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        if isinstance(p, dict):
+            try:
+                totals.append(float(p.get("total_cost_usd") or 0.0))
+            except Exception:
+                pass
     elif m == "both":
-        await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
-        await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        s = await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        if isinstance(s, dict):
+            try:
+                totals.append(float(s.get("total_cost_usd") or 0.0))
+            except Exception:
+                pass
+        p = await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        if isinstance(p, dict):
+            try:
+                totals.append(float(p.get("total_cost_usd") or 0.0))
+            except Exception:
+                pass
     else:
         raise ValueError(f"Unsupported mode: {mode}. Use 'single', 'pairwise', 'both', or 'config'.")
+
+    try:
+        total_cost = round(sum(totals), 6)
+    except Exception:
+        total_cost = 0.0
+    result["total_cost_usd"] = total_cost
+    # Emit a clear final line for downstream capture
+    print(f"[EVAL COST] total_cost_usd={total_cost}")
+    return result
 
 
 def get_best_report_by_elo(
