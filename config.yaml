@@ -9,21 +9,12 @@ retries:
   max_delay_seconds: 10
   jitter: true
 models:
-  google_gemini-2.5-flash:
-    provider: google
-    model: gemini-2.5-flash
   google_gemini-2.5-flash-lite:
     provider: google
     model: gemini-2.5-flash-lite
   openai_gpt-5-mini:
     provider: openai
     model: gpt-5-mini
-  openai_gpt-5-nano:
-    provider: openai
-    model: gpt-5-nano
-  openai_o4-mini:
-    provider: openai
-    model: o4-mini
 single_doc_eval:
   trial_count: 1
   criteria_file: criteria.yaml
