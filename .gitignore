@@ -1,0 +1,6 @@
+# Ignore fpf run summaries
+fpf_run_summaries/
+
+# Ignore sqlite results
+results_*.sqlite
+results_*.sqlite-journal
