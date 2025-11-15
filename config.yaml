@@ -23,3 +23,10 @@ pairwise_eval:
   criteria_file: criteria.yaml
 evaluation:
   mode: both
+
+jsonify:
+  enabled: true
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.1
+  max_output_tokens: 500

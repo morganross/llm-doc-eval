@@ -177,6 +177,79 @@ def _compute_elo_from_db(db_path: str, k_factor: float = 32.0, initial: float = 
     return ratings
 
 
+async def _jsonify_response(raw_text: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Two-stage JSON recovery: if raw text is not valid JSON, use an LLM (jsonify provider)
+    to reformat it into strict JSON.
+    
+    Args:
+        raw_text: The raw response text that failed JSON parsing
+        config: The jsonify config section from config.yaml
+        
+    Returns:
+        Parsed JSON dict, or None if recovery fails
+    """
+    if not config or not config.get("enabled"):
+        return None
+    
+    try:
+        provider = config.get("provider", "openai")
+        model = config.get("model", "gpt-4o-mini")
+        temperature = config.get("temperature", 0.1)
+        max_tokens = config.get("max_output_tokens", 500)
+        
+        # Build the jsonify request
+        jsonify_prompt = (
+            "You are a JSON formatter. The following is an evaluation response that failed JSON parsing. "
+            "Please reformat it into valid JSON with this exact structure:\n"
+            "{\n"
+            '  "evaluations": [\n'
+            "    {\n"
+            '      "criterion": "<string>",\n'
+            '      "score": <1-5>,\n'
+            '      "reason": "<string>"\n'
+            "    }\n"
+            "  ]\n"
+            "}\n\n"
+            "Response to reformat:\n"
+            f"{raw_text}\n\n"
+            "Return ONLY valid JSON, no markdown or other text."
+        )
+        
+        # Use FilePromptForge to call the jsonify provider
+        run_spec = {
+            "endpoint": f"{provider}:{model}",
+            "input": jsonify_prompt,
+            "params": {
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            }
+        }
+        
+        runs = [run_spec]
+        options = {"json": True}
+        
+        result = await fpf_runner.run_filepromptforge_batch(runs, options=options)
+        
+        if result and isinstance(result, list) and len(result) > 0:
+            response_text = result[0].get("response", "") if isinstance(result[0], dict) else str(result[0])
+            try:
+                return json.loads(response_text)
+            except Exception:
+                # Try to extract JSON from response
+                import re as _re
+                m = _re.search(r"\{.*\}", response_text, flags=_re.DOTALL)
+                if m:
+                    try:
+                        return json.loads(m.group(0))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    
+    return None
+
+
 def _aggregate_fpf_costs(log_dir: str, run_group_id: str) -> Dict[str, Any]:
     """
     Sum total_cost_usd across FPF consolidated logs for a given run_group_id.
@@ -420,6 +493,9 @@ async def run_single_evaluation(
     conn = sqlite3.connect(db)
     try:
         trial = 1
+        # Get jsonify config for recovery fallback
+        jsonify_cfg = cfg.get("jsonify") if cfg else None
+        
         # Parse outputs
         for out_path, (provider, model, doc_id) in mapping.items():
             if not os.path.exists(out_path):
@@ -442,6 +518,14 @@ async def run_single_evaluation(
                         parsed = json.loads(m.group(0))
                     except Exception:
                         parsed = None
+                
+                # If all JSON attempts failed, try jsonify recovery
+                if parsed is None and jsonify_cfg and jsonify_cfg.get("enabled"):
+                    try:
+                        parsed = await _jsonify_response(raw, jsonify_cfg)
+                    except Exception:
+                        parsed = None
+            
             if not isinstance(parsed, dict):
                 # No result for this doc
                 continue
