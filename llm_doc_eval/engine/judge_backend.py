@@ -24,8 +24,8 @@ class JudgeCfg:
     provider: str
     model: str
     temperature: float = 0.0
-    max_tokens: int = 1024
-    enable_grounding: bool = False
+    max_tokens: int = 21024
+    enable_grounding: bool = True
     timeout_seconds: int = 120
     attempts: int = 3
     base_delay_seconds: int = 2

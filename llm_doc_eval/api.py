@@ -442,9 +442,11 @@ async def run_single_evaluation(
     run_group_id = _uuid.uuid4().hex
     fpf_logs_dir = os.path.join(tempfile.gettempdir(), f"llm_doc_eval_single_logs_{run_group_id}")
     os.makedirs(fpf_logs_dir, exist_ok=True)
-    logger.info(f"Single-doc evaluation run_group_id: {run_group_id}")
-    logger.info(f"FPF logs directory: {fpf_logs_dir}")
-    logger.info(f"Temp directory: {tmp_dir}")
+    logger.info(f"[EVAL_SETUP] Single-doc evaluation run_group_id: {run_group_id}")
+    logger.info(f"[EVAL_SETUP] FPF logs directory: {fpf_logs_dir}")
+    logger.info(f"[EVAL_SETUP] Temp directory: {tmp_dir}")
+    logger.info(f"[EVAL_SETUP] Database path: {db}")
+    logger.info(f"[EVAL_SETUP] Processing {len(doc_paths)} documents with {len(provider_models)} models = {len(doc_paths) * len(provider_models)} total evaluations")
     runs: List[Dict[str, Any]] = []
     mapping: Dict[str, Tuple[str, str, str]] = {}  # out_path -> (provider, model, doc_id)
 
@@ -493,21 +495,30 @@ async def run_single_evaluation(
                 }
             })
             mapping[out_path] = (provider, model, doc_id)
+            logger.debug(f"[EVAL_RUN_PREP] {run_id}: instr={instr_path}, out={out_path}")
 
     # Submit in one batch (centralized concurrency inside FPF)
     base_opts: Dict[str, Any] = {"json": True, "run_group_id": run_group_id, "fpf_log_dir": fpf_logs_dir}
     if max_conc is not None:
         base_opts["max_concurrency"] = max_conc
-        logger.info(f"Max concurrency: {max_conc}")
+        logger.info(f"[EVAL_FPF_OPTS] Max concurrency: {max_conc}")
     options = base_opts
-    logger.info(f"Submitting {len(runs)} single-doc evaluation runs to FPF...")
+    logger.info(f"[EVAL_FPF_START] Submitting {len(runs)} single-doc evaluation runs to FPF batch")
+    logger.info(f"[EVAL_FPF_START] Options: {options}")
+    logger.info(f"[EVAL_FPF_START] Expected output files in: {tmp_dir}")
+    fpf_exception = None
+    fpf_start_time = datetime.datetime.now()
     try:
-        _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
-        logger.info("FPF batch execution completed")
+        batch_result = await fpf_runner.run_filepromptforge_batch(runs, options=options)
+        fpf_duration = (datetime.datetime.now() - fpf_start_time).total_seconds()
+        logger.info(f"[EVAL_FPF_COMPLETE] FPF batch execution completed successfully in {fpf_duration:.2f}s")
+        logger.info(f"[EVAL_FPF_COMPLETE] Batch result: {batch_result}")
     except Exception as e:
-        # Proceed to parse any outputs that may have been produced
-        # but surface the error if nothing succeeded.
-        pass
+        fpf_duration = (datetime.datetime.now() - fpf_start_time).total_seconds()
+        logger.error(f"[EVAL_FPF_ERROR] FPF batch execution failed after {fpf_duration:.2f}s: {type(e).__name__}: {e}")
+        logger.error(f"[EVAL_FPF_ERROR] Full traceback:", exc_info=True)
+        fpf_exception = e
+        # Continue to parse outputs - some may have succeeded
 
     summary: Optional[Dict[str, Any]] = None
     conn = sqlite3.connect(db)
@@ -517,12 +528,27 @@ async def run_single_evaluation(
         jsonify_cfg = cfg.get("jsonify") if cfg else None
         
         # Parse outputs
-        logger.info(f"Parsing {len(mapping)} output files...")
+        logger.info(f"[EVAL_PARSE_START] Parsing {len(mapping)} output files from temp directory: {tmp_dir}")
+        # List all files in temp directory for debugging
+        try:
+            actual_files = os.listdir(tmp_dir)
+            logger.info(f"[EVAL_PARSE_FILES] Temp directory contains {len(actual_files)} files: {actual_files[:20]}{'...' if len(actual_files) > 20 else ''}")
+        except Exception as e:
+            logger.error(f"[EVAL_PARSE_ERROR] Failed to list temp directory: {e}")
+        
         parsed_count = 0
+        missing_count = 0
+        invalid_json_count = 0
+        no_evals_count = 0
+        
         for out_path, (provider, model, doc_id) in mapping.items():
             if not os.path.exists(out_path):
-                logger.warning(f"Output file missing: {out_path}")
+                missing_count += 1
+                logger.warning(f"[EVAL_PARSE_MISSING] Output file missing ({missing_count}/{len(mapping)}): {out_path}")
                 continue
+            
+            file_size = os.path.getsize(out_path)
+            logger.debug(f"[EVAL_PARSE_FILE] Reading {doc_id} with {provider}:{model} from {out_path} ({file_size} bytes)")
             with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
                 raw = fh.read()
             # Try strict JSON first; else find first {...}
@@ -550,16 +576,20 @@ async def run_single_evaluation(
                         parsed = None
             
             if not isinstance(parsed, dict):
-                # No result for this doc
-                logger.warning(f"Invalid JSON structure for {doc_id} with {provider}:{model}")
+                invalid_json_count += 1
+                logger.warning(f"[EVAL_PARSE_INVALID] Invalid JSON structure for {doc_id} with {provider}:{model} - got type {type(parsed).__name__}")
+                logger.debug(f"[EVAL_PARSE_INVALID] Raw content preview: {raw[:500]}")
                 continue
             evals = parsed.get("evaluations")
             if not isinstance(evals, list) or not evals:
-                logger.warning(f"No evaluations found for {doc_id} with {provider}:{model}")
+                no_evals_count += 1
+                logger.warning(f"[EVAL_PARSE_NO_EVALS] No evaluations found for {doc_id} with {provider}:{model}")
+                logger.debug(f"[EVAL_PARSE_NO_EVALS] Parsed dict keys: {list(parsed.keys())}")
                 continue
             model_label = f"{provider}:{model}"
             parsed_count += 1
-            logger.debug(f"Successfully parsed {doc_id} with {model_label}: {len(evals)} criteria")
+            valid_criteria = 0
+            logger.info(f"[EVAL_PARSE_SUCCESS] Successfully parsed {doc_id} with {model_label}: {len(evals)} criteria")
             for item in evals:
                 if not isinstance(item, dict):
                     continue
@@ -573,8 +603,30 @@ async def run_single_evaluation(
                 if not isinstance(reason, str) or not reason.strip():
                     continue
                 _persist_single_result(conn, doc_id, model_label, trial, criterion.strip(), int(score), reason.strip())
+                valid_criteria += 1
+            logger.debug(f"[EVAL_DB_INSERT] Inserted {valid_criteria} criteria for {doc_id} with {model_label}")
+        # Get row count before commit
+        row_count_before = conn.execute("SELECT COUNT(*) FROM single_doc_results").fetchone()[0]
+        logger.info(f"[EVAL_DB_COMMIT] Committing transaction with {row_count_before} rows...")
         conn.commit()
-        logger.info(f"Successfully persisted {parsed_count} single-doc evaluations to database")
+        row_count_after = conn.execute("SELECT COUNT(*) FROM single_doc_results").fetchone()[0]
+        
+        logger.info(f"[EVAL_SUMMARY] === Evaluation Complete ===")
+        logger.info(f"[EVAL_SUMMARY] Total expected: {len(mapping)} evaluations")
+        logger.info(f"[EVAL_SUMMARY] Successfully parsed: {parsed_count}")
+        logger.info(f"[EVAL_SUMMARY] Missing output files: {missing_count}")
+        logger.info(f"[EVAL_SUMMARY] Invalid JSON: {invalid_json_count}")
+        logger.info(f"[EVAL_SUMMARY] No evaluations in response: {no_evals_count}")
+        logger.info(f"[EVAL_SUMMARY] Database rows written: {row_count_after}")
+        logger.info(f"[EVAL_SUMMARY] Database path: {db}")
+        
+        if parsed_count == 0:
+            error_msg = f"CRITICAL: No evaluation results were saved to database. FPF exception: {fpf_exception}. Missing files: {missing_count}/{len(mapping)}"
+            logger.error(f"[EVAL_ERROR] {error_msg}")
+            if fpf_exception:
+                raise RuntimeError(f"Evaluation failed - no results persisted. Original error: {fpf_exception}")
+        elif parsed_count < len(mapping):
+            logger.warning(f"[EVAL_WARNING] Partial success: {parsed_count}/{len(mapping)} evaluations saved ({missing_count} files missing, {invalid_json_count} invalid JSON, {no_evals_count} no evals)")
 
         # Aggregate per-runs cost from FPF logs and persist summary
         try:
