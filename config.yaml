@@ -8,6 +8,10 @@ retries:
   base_delay_seconds: 2
   max_delay_seconds: 10
   jitter: true
+judge_defaults:
+  temperature: 0.0
+  max_tokens: 24096
+  enable_grounding: false
 models:
   google_gemini-2.5-flash-lite:
     provider: google

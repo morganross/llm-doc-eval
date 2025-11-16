@@ -2,10 +2,20 @@ import os
 import sqlite3
 import itertools
 import datetime
+import logging
 from typing import Dict, Optional, List, Tuple, Any
 
 # Public globals expected by api_cost_multiplier/evaluate.py
 DOC_PATHS: Dict[str, str] = {}
+
+# Setup logging
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('[%(asctime)s] %(levelname)s - %(name)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)  # Change to DEBUG for verbose output
 
 # Default DB lives alongside this package
 DB_PATH: str = os.path.join(os.path.dirname(__file__), "results.sqlite")
@@ -392,12 +402,15 @@ async def run_single_evaluation(
 
     # Discover candidates
     doc_paths = _read_candidates(folder_path)
+    logger.info(f"Found {len(doc_paths)} candidate documents in {folder_path}")
     if len(doc_paths) < 1:
+        logger.warning("No documents found for evaluation")
         return
 
     # Publish to global DOC_PATHS
     DOC_PATHS.clear()
     DOC_PATHS.update(doc_paths)
+    logger.debug(f"Document IDs: {list(doc_paths.keys())}")
 
     # Load contents
     contents = _load_contents(doc_paths)
@@ -412,6 +425,7 @@ async def run_single_evaluation(
 
     # Models to evaluate
     provider_models = _collect_models(cfg)
+    logger.info(f"Using {len(provider_models)} judge models: {[f'{p}:{m}' for p, m in provider_models]}")
 
     # Resolve concurrency (optional)
     max_conc = None
@@ -428,6 +442,9 @@ async def run_single_evaluation(
     run_group_id = _uuid.uuid4().hex
     fpf_logs_dir = os.path.join(tempfile.gettempdir(), f"llm_doc_eval_single_logs_{run_group_id}")
     os.makedirs(fpf_logs_dir, exist_ok=True)
+    logger.info(f"Single-doc evaluation run_group_id: {run_group_id}")
+    logger.info(f"FPF logs directory: {fpf_logs_dir}")
+    logger.info(f"Temp directory: {tmp_dir}")
     runs: List[Dict[str, Any]] = []
     mapping: Dict[str, Tuple[str, str, str]] = {}  # out_path -> (provider, model, doc_id)
 
@@ -481,9 +498,12 @@ async def run_single_evaluation(
     base_opts: Dict[str, Any] = {"json": True, "run_group_id": run_group_id, "fpf_log_dir": fpf_logs_dir}
     if max_conc is not None:
         base_opts["max_concurrency"] = max_conc
+        logger.info(f"Max concurrency: {max_conc}")
     options = base_opts
+    logger.info(f"Submitting {len(runs)} single-doc evaluation runs to FPF...")
     try:
         _ = await fpf_runner.run_filepromptforge_batch(runs, options=options)
+        logger.info("FPF batch execution completed")
     except Exception as e:
         # Proceed to parse any outputs that may have been produced
         # but surface the error if nothing succeeded.
@@ -497,8 +517,11 @@ async def run_single_evaluation(
         jsonify_cfg = cfg.get("jsonify") if cfg else None
         
         # Parse outputs
+        logger.info(f"Parsing {len(mapping)} output files...")
+        parsed_count = 0
         for out_path, (provider, model, doc_id) in mapping.items():
             if not os.path.exists(out_path):
+                logger.warning(f"Output file missing: {out_path}")
                 continue
             with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
                 raw = fh.read()
@@ -528,11 +551,15 @@ async def run_single_evaluation(
             
             if not isinstance(parsed, dict):
                 # No result for this doc
+                logger.warning(f"Invalid JSON structure for {doc_id} with {provider}:{model}")
                 continue
             evals = parsed.get("evaluations")
             if not isinstance(evals, list) or not evals:
+                logger.warning(f"No evaluations found for {doc_id} with {provider}:{model}")
                 continue
             model_label = f"{provider}:{model}"
+            parsed_count += 1
+            logger.debug(f"Successfully parsed {doc_id} with {model_label}: {len(evals)} criteria")
             for item in evals:
                 if not isinstance(item, dict):
                     continue
@@ -547,6 +574,7 @@ async def run_single_evaluation(
                     continue
                 _persist_single_result(conn, doc_id, model_label, trial, criterion.strip(), int(score), reason.strip())
         conn.commit()
+        logger.info(f"Successfully persisted {parsed_count} single-doc evaluations to database")
 
         # Aggregate per-runs cost from FPF logs and persist summary
         try:
@@ -598,8 +626,10 @@ async def run_pairwise_evaluation(
 
     # Discover candidates
     doc_paths = _read_candidates(folder_path)
+    logger.info(f"Found {len(doc_paths)} candidate documents in {folder_path}")
     if len(doc_paths) < 2:
         # Nothing to compare; do not write any rows
+        logger.warning(f"Need at least 2 documents for pairwise evaluation, found {len(doc_paths)}")
         return
 
     # Publish to global DOC_PATHS (contract relied upon by ACM test harness)
@@ -643,6 +673,7 @@ async def run_pairwise_evaluation(
 
     # Build all pair combinations once
     pairs = list(itertools.combinations(sorted(doc_paths.keys()), 2))
+    logger.info(f"Generated {len(pairs)} pairwise combinations for evaluation")
 
     summary: Optional[Dict[str, Any]] = None
     conn = sqlite3.connect(db)
@@ -651,8 +682,11 @@ async def run_pairwise_evaluation(
         run_group_id = _uuid.uuid4().hex
         fpf_logs_dir = os.path.join(tempfile.gettempdir(), f"llm_doc_eval_pair_logs_{run_group_id}")
         os.makedirs(fpf_logs_dir, exist_ok=True)
+        logger.info(f"Pairwise evaluation run_group_id: {run_group_id}")
+        logger.info(f"FPF logs directory: {fpf_logs_dir}")
 
         for provider, model in provider_models:
+            logger.info(f"Processing pairwise evaluations with {provider}:{model}...")
             tmp_dir = tempfile.mkdtemp(prefix="llm_doc_eval_pair_batch_")
             runs: List[Dict[str, Any]] = []
             mapping: Dict[str, Tuple[str, str, str, str]] = {}  # out_path -> (provider, model, a_id, b_id)
