@@ -388,6 +388,7 @@ async def run_single_evaluation(
     db_path: Optional[str] = None,
     config_path: Optional[str] = None,
     criteria_path: Optional[str] = None,
+    iterations: int = 1,
 ) -> Optional[Dict[str, Any]]:
     """
     Scan folder_path for candidate reports and run single-document grading via FPF in batch.
@@ -446,9 +447,9 @@ async def run_single_evaluation(
     logger.info(f"[EVAL_SETUP] FPF logs directory: {fpf_logs_dir}")
     logger.info(f"[EVAL_SETUP] Temp directory: {tmp_dir}")
     logger.info(f"[EVAL_SETUP] Database path: {db}")
-    logger.info(f"[EVAL_SETUP] Processing {len(doc_paths)} documents with {len(provider_models)} models = {len(doc_paths) * len(provider_models)} total evaluations")
+    logger.info(f"[EVAL_SETUP] Processing {len(doc_paths)} documents with {len(provider_models)} models x {iterations} iterations = {len(doc_paths) * len(provider_models) * iterations} total evaluations")
     runs: List[Dict[str, Any]] = []
-    mapping: Dict[str, Tuple[str, str, str]] = {}  # out_path -> (provider, model, doc_id)
+    mapping: Dict[str, Tuple[str, str, str, int]] = {}  # out_path -> (provider, model, doc_id, trial)
 
     # Load template once
     here = os.path.dirname(os.path.abspath(__file__))
@@ -469,33 +470,34 @@ async def run_single_evaluation(
             crit_lines = "\n".join(f"- {c}" for c in criteria) if criteria else "- overall quality"
             instr_text = single_tpl.replace("{{CRITERIA}}", crit_lines).replace("{{DOC_CONTENT}}", content)
 
-            # Write files
-            uid = (_uuid.uuid4().hex[:8] if _uuid else "uid")
-            instr_path = os.path.join(tmp_dir, f"single_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(doc_id)}_{uid}.txt")
-            payload_path = os.path.join(tmp_dir, f"payload_{uid}.txt")
-            out_path = os.path.join(tmp_dir, f"out_single_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(doc_id)}_{uid}.txt")
-            try:
-                with open(instr_path, "w", encoding="utf-8") as fh:
-                    fh.write(instr_text)
-                with open(payload_path, "w", encoding="utf-8") as fh:
-                    fh.write("Single-document evaluation payload placeholder.")
-            except Exception as e:
-                raise RuntimeError(f"Failed to write temp instruction/payload files: {e}")
+            for trial_idx in range(1, iterations + 1):
+                # Write files
+                uid = (_uuid.uuid4().hex[:8] if _uuid else "uid")
+                instr_path = os.path.join(tmp_dir, f"single_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(doc_id)}_t{trial_idx}_{uid}.txt")
+                payload_path = os.path.join(tmp_dir, f"payload_{uid}.txt")
+                out_path = os.path.join(tmp_dir, f"out_single_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(doc_id)}_t{trial_idx}_{uid}.txt")
+                try:
+                    with open(instr_path, "w", encoding="utf-8") as fh:
+                        fh.write(instr_text)
+                    with open(payload_path, "w", encoding="utf-8") as fh:
+                        fh.write("Single-document evaluation payload placeholder.")
+                except Exception as e:
+                    raise RuntimeError(f"Failed to write temp instruction/payload files: {e}")
 
-            run_id = f"single-{_sanitize(provider)}-{_sanitize(model)}-{_sanitize(doc_id)}-{uid}"
-            runs.append({
-                "id": run_id,
-                "provider": provider,
-                "model": model,
-                "file_a": instr_path,
-                "file_b": payload_path,
-                "out": out_path,
-                "overrides": {
-                    "request_json": True
-                }
-            })
-            mapping[out_path] = (provider, model, doc_id)
-            logger.debug(f"[EVAL_RUN_PREP] {run_id}: instr={instr_path}, out={out_path}")
+                run_id = f"single-{_sanitize(provider)}-{_sanitize(model)}-{_sanitize(doc_id)}-t{trial_idx}-{uid}"
+                runs.append({
+                    "id": run_id,
+                    "provider": provider,
+                    "model": model,
+                    "file_a": instr_path,
+                    "file_b": payload_path,
+                    "out": out_path,
+                    "overrides": {
+                        "request_json": True
+                    }
+                })
+                mapping[out_path] = (provider, model, doc_id, trial_idx)
+                logger.debug(f"[EVAL_RUN_PREP] {run_id}: instr={instr_path}, out={out_path}")
 
     # Submit in one batch (centralized concurrency inside FPF)
     base_opts: Dict[str, Any] = {"json": True, "run_group_id": run_group_id, "fpf_log_dir": fpf_logs_dir}
@@ -523,7 +525,6 @@ async def run_single_evaluation(
     summary: Optional[Dict[str, Any]] = None
     conn = sqlite3.connect(db)
     try:
-        trial = 1
         # Get jsonify config for recovery fallback
         jsonify_cfg = cfg.get("jsonify") if cfg else None
         
@@ -541,7 +542,7 @@ async def run_single_evaluation(
         invalid_json_count = 0
         no_evals_count = 0
         
-        for out_path, (provider, model, doc_id) in mapping.items():
+        for out_path, (provider, model, doc_id, trial) in mapping.items():
             if not os.path.exists(out_path):
                 missing_count += 1
                 logger.warning(f"[EVAL_PARSE_MISSING] Output file missing ({missing_count}/{len(mapping)}): {out_path}")
@@ -589,7 +590,7 @@ async def run_single_evaluation(
             model_label = f"{provider}:{model}"
             parsed_count += 1
             valid_criteria = 0
-            logger.info(f"[EVAL_PARSE_SUCCESS] Successfully parsed {doc_id} with {model_label}: {len(evals)} criteria")
+            logger.info(f"[EVAL_PARSE_SUCCESS] Successfully parsed {doc_id} with {model_label} (Trial {trial}): {len(evals)} criteria")
             for item in evals:
                 if not isinstance(item, dict):
                     continue
@@ -665,6 +666,7 @@ async def run_pairwise_evaluation(
     db_path: Optional[str] = None,
     config_path: Optional[str] = None,
     criteria_path: Optional[str] = None,
+    iterations: int = 1,
 ) -> Optional[Dict[str, Any]]:
     """
     Scan folder_path for candidate reports and evaluate all pairs via a single FPF batch per model.
@@ -738,10 +740,10 @@ async def run_pairwise_evaluation(
         logger.info(f"FPF logs directory: {fpf_logs_dir}")
 
         for provider, model in provider_models:
-            logger.info(f"Processing pairwise evaluations with {provider}:{model}...")
+            logger.info(f"Processing pairwise evaluations with {provider}:{model} (Iterations: {iterations})...")
             tmp_dir = tempfile.mkdtemp(prefix="llm_doc_eval_pair_batch_")
             runs: List[Dict[str, Any]] = []
-            mapping: Dict[str, Tuple[str, str, str, str]] = {}  # out_path -> (provider, model, a_id, b_id)
+            mapping: Dict[str, Tuple[str, str, str, str, int]] = {}  # out_path -> (provider, model, a_id, b_id, trial)
 
             for (a_id, b_id) in pairs:
                 doc_a = contents.get(a_id, "")
@@ -755,31 +757,33 @@ async def run_pairwise_evaluation(
                     .replace("{{DOC_A_CONTENT}}", doc_a)
                     .replace("{{DOC_B_CONTENT}}", doc_b)
                 )
-                uid = (_uuid.uuid4().hex[:8] if _uuid else "uid")
-                instr_path = os.path.join(tmp_dir, f"pair_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(a_id)}_{_sanitize(b_id)}_{uid}.txt")
-                payload_path = os.path.join(tmp_dir, f"payload_{uid}.txt")
-                out_path = os.path.join(tmp_dir, f"out_pair_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(a_id)}_{_sanitize(b_id)}_{uid}.txt")
-                try:
-                    with open(instr_path, "w", encoding="utf-8") as fh:
-                        fh.write(instr_text)
-                    with open(payload_path, "w", encoding="utf-8") as fh:
-                        fh.write("Pairwise evaluation payload placeholder.")
-                except Exception as e:
-                    raise RuntimeError(f"Failed to write temp instruction/payload files: {e}")
+                
+                for trial_idx in range(1, iterations + 1):
+                    uid = (_uuid.uuid4().hex[:8] if _uuid else "uid")
+                    instr_path = os.path.join(tmp_dir, f"pair_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(a_id)}_{_sanitize(b_id)}_t{trial_idx}_{uid}.txt")
+                    payload_path = os.path.join(tmp_dir, f"payload_{uid}.txt")
+                    out_path = os.path.join(tmp_dir, f"out_pair_{_sanitize(provider)}_{_sanitize(model)}_{_sanitize(a_id)}_{_sanitize(b_id)}_t{trial_idx}_{uid}.txt")
+                    try:
+                        with open(instr_path, "w", encoding="utf-8") as fh:
+                            fh.write(instr_text)
+                        with open(payload_path, "w", encoding="utf-8") as fh:
+                            fh.write("Pairwise evaluation payload placeholder.")
+                    except Exception as e:
+                        raise RuntimeError(f"Failed to write temp instruction/payload files: {e}")
 
-                run_id = f"pair-{_sanitize(provider)}-{_sanitize(model)}-{_sanitize(a_id)}-{_sanitize(b_id)}-{uid}"
-                runs.append({
-                    "id": run_id,
-                    "provider": provider,
-                    "model": model,
-                    "file_a": instr_path,
-                    "file_b": payload_path,
-                    "out": out_path,
-                    "overrides": {
-                        "request_json": True
-                    }
-                })
-                mapping[out_path] = (provider, model, a_id, b_id)
+                    run_id = f"pair-{_sanitize(provider)}-{_sanitize(model)}-{_sanitize(a_id)}-{_sanitize(b_id)}-t{trial_idx}-{uid}"
+                    runs.append({
+                        "id": run_id,
+                        "provider": provider,
+                        "model": model,
+                        "file_a": instr_path,
+                        "file_b": payload_path,
+                        "out": out_path,
+                        "overrides": {
+                            "request_json": True
+                        }
+                    })
+                    mapping[out_path] = (provider, model, a_id, b_id, trial_idx)
 
             # Submit one batch for this provider:model
             base_opts: Dict[str, Any] = {"json": True, "run_group_id": run_group_id, "fpf_log_dir": fpf_logs_dir}
@@ -794,8 +798,7 @@ async def run_pairwise_evaluation(
 
             # Parse results and persist
             model_label = f"{provider}:{model}"
-            trial = 1
-            for out_path, (_prov, _mod, a_id, b_id) in mapping.items():
+            for out_path, (_prov, _mod, a_id, b_id, trial) in mapping.items():
                 if not os.path.exists(out_path):
                     continue
                 with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
@@ -866,6 +869,7 @@ async def run_evaluation(
     db_path: Optional[str] = None,
     config_path: Optional[str] = None,
     criteria_path: Optional[str] = None,
+    iterations: int = 1,
 ) -> Dict[str, Any]:
     """
     Wrapper to run evaluation in single, pairwise, or both modes.
@@ -886,27 +890,27 @@ async def run_evaluation(
     result: Dict[str, Any] = {"mode": m, "total_cost_usd": 0.0}
 
     if m == "single":
-        s = await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        s = await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path, iterations=iterations)
         if isinstance(s, dict):
             try:
                 totals.append(float(s.get("total_cost_usd") or 0.0))
             except Exception:
                 pass
     elif m == "pairwise":
-        p = await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        p = await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path, iterations=iterations)
         if isinstance(p, dict):
             try:
                 totals.append(float(p.get("total_cost_usd") or 0.0))
             except Exception:
                 pass
     elif m == "both":
-        s = await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        s = await run_single_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path, iterations=iterations)
         if isinstance(s, dict):
             try:
                 totals.append(float(s.get("total_cost_usd") or 0.0))
             except Exception:
                 pass
-        p = await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path)
+        p = await run_pairwise_evaluation(folder_path=folder_path, db_path=db_path, config_path=config_path, criteria_path=criteria_path, iterations=iterations)
         if isinstance(p, dict):
             try:
                 totals.append(float(p.get("total_cost_usd") or 0.0))

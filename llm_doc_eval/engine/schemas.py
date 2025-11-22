@@ -29,8 +29,12 @@ def load_criteria(criteria_path: str) -> List[str]:
             names.append(item)
         elif isinstance(item, dict):
             n = item.get("name")
+            d = item.get("description")
             if isinstance(n, str) and n.strip():
-                names.append(n.strip())
+                if isinstance(d, str) and d.strip():
+                    names.append(f"{n.strip()}: {d.strip()}")
+                else:
+                    names.append(n.strip())
     # dedupe while preserving order
     seen = set()
     result: List[str] = []

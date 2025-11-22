@@ -1,6 +1,24 @@
 # Default evaluation criteria (can be extended with name/description/weight objects)
 criteria:
-  - factuality
-  - relevance
-  - completeness
-  - style_clarity
+  - name: factuality
+    description: "Accuracy of facts and data presented in the document. Scale: 1 = Contains fabrications or severe errors. 3 = Mostly accurate but with minor slips. 5 = Absolute truth, verified against official records, zero hallucinations."
+  - name: relevance
+    description: "Alignment with the user's query and intent. Scale: 1 = Ignores instructions. 3 = Follows general topic but misses constraints. 5 = Follows every single instruction and constraint perfectly."
+  - name: completeness
+    description: "Coverage of all necessary aspects of the topic. Scale: 1 = Fragmentary or missing major sections. 3 = Covers basics but misses depth. 5 = Comprehensive, leaving no question unanswered."
+  - name: style_clarity
+    description: "Readability, flow, and professional tone. Scale: 1 = Incoherent or riddled with errors. 3 = Readable but dry or awkward. 5 = Masterful, compelling, and error-free."
+  - name: political_adherence
+    description: "Adherence to the perspective of a left-leaning political party. Scale: 1 = Neutral, apologetic, or pro-administration. 3 = Critical but hesitant or \"both-sides\". 5 = Fiercely anti-fascist, explicitly naming the authoritarian agenda without flinching."
+  - name: redundancy
+    description: "Check for unnecessary repetition of information or arguments. Scale: 1 = Highly repetitive, looping content, and filler. 3 = Some repetition. 5 = Surgical precision, zero wasted words."
+  - name: structure_consistency
+    description: "Ensure the document follows the required format (Official Title, Derisive Name, List of Actions, Stated vs Nefarious Purpose, Connection to Broader Plans, Harm Description, Remedial Actions). Scale: 1 = Wrong format or missing sections. 3 = Mostly follows format but misses a section or order. 5 = Rigid adherence to the specific 7-part structure defined in instructions."
+  - name: depth_of_analysis
+    description: "Level of insight, critical thinking, and exploration of nuances. Scale: 1 = Surface level summary. 3 = Some analysis but mostly descriptive. 5 = Deep, systemic critique connecting specific actions to broader authoritarian strategies."
+  - name: source_quality
+    description: "Reliability and appropriateness of the cited sources and references. Scale: 1 = Uncited or relies on low-quality blogs. 3 = Decent sources but lacks primary documents. 5 = Relies heavily on primary government documents (Federal Register) and high-tier research."
+  - name: rhetorical_intensity
+    description: "Assessment of the language's emotional charge and dramatic flair. Scale: 1 = Neutral, clinical, and objective. 5 = Bombastic, hyperbolic, inflammatory, grandiloquent, and sensationalist."
+  - name: toc_accuracy
+    description: "Strict verification that the Table of Contents exactly matches the document structure. Scale: 1 = TOC is missing or completely mismatched. 3 = Mostly correct but with minor wording differences. 5 = Pixel-perfect match between TOC entries and document headers."

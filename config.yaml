@@ -13,12 +13,12 @@ judge_defaults:
   max_tokens: 24096
   enable_grounding: true
 models:
-  google_gemini-2.5-flash-lite:
+  google_gemini-2.5-pro:
     provider: google
-    model: gemini-2.5-flash-lite
-  openai_gpt-5-mini:
+    model: gemini-2.5-pro
+  openai_gpt-5:
     provider: openai
-    model: gpt-5-mini
+    model: gpt-5
 single_doc_eval:
   trial_count: 1
   criteria_file: criteria.yaml
@@ -27,7 +27,6 @@ pairwise_eval:
   criteria_file: criteria.yaml
 evaluation:
   mode: both
-
 jsonify:
   enabled: true
   provider: openai
